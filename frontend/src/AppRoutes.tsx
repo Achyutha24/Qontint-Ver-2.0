@@ -1,0 +1,76 @@
+/**
+ * AppRoutes — Centralized routing configuration.
+ *
+ * Public routes (LandingLayout):
+ *   /          → Landing (homepage with domain selector)
+ *   /pricing   → PricingPage
+ *   /login     → LoginPage
+ *   /register  → RegisterPage
+ *
+ * Protected app routes (AppLayout + DomainGuard):
+ *   /app              → redirect to /app/analyze
+ *   /app/analyze      → AnalyzePage
+ *   /app/generate     → GeneratePage
+ *   /app/intelligence → QueryIntelPage
+ *   /app/competitor   → AnalyzePage (competitor analysis mode)
+ *   /app/graph        → GraphPage
+ *   /app/youtube      → YouTubePage
+ *   /app/keywords     → KeywordsPage
+ *   /app/dashboard    → DashboardPage
+ */
+import { Routes, Route, Navigate } from 'react-router-dom'
+
+
+// Layouts
+import LandingLayout from './layouts/LandingLayout'
+import AppLayout from './layouts/AppLayout'
+
+// Guard
+import DomainGuard from './components/DomainGuard'
+
+// Landing pages
+import Landing from './pages/Landing'
+import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
+
+// Existing pages — imported directly, NOT rewritten
+import PricingPage from './pages/PricingPage'
+import AnalyzePage from './pages/AnalyzePage'
+import GeneratePage from './pages/GeneratePage'
+import QueryIntelPage from './pages/QueryIntelPage'
+import GraphPage from './pages/GraphPage'
+import YouTubePage from './pages/YouTubePage'
+import KeywordsPage from './pages/KeywordsPage'
+import DashboardPage from './pages/DashboardPage'
+
+export default function AppRoutes() {
+  return (
+    <Routes>
+      {/* ── Public / Landing routes ── */}
+      <Route element={<LandingLayout />}>
+        <Route path="/" element={<Landing />} />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+      </Route>
+
+      {/* ── Application workspace routes (protected by DomainGuard) ── */}
+      <Route element={<AppLayout />}>
+        {/* DomainGuard: redirects to "/" if no workspace selected */}
+        <Route element={<DomainGuard />}>
+          <Route path="/app" element={<Navigate to="/app/analyze" replace />} />
+          <Route path="/app/analyze" element={<AnalyzePage />} />
+          <Route path="/app/generate" element={<GeneratePage />} />
+          <Route path="/app/intelligence" element={<QueryIntelPage />} />
+          <Route path="/app/graph" element={<GraphPage />} />
+          <Route path="/app/youtube" element={<YouTubePage />} />
+          <Route path="/app/keywords" element={<KeywordsPage />} />
+          <Route path="/app/dashboard" element={<DashboardPage />} />
+        </Route>
+      </Route>
+
+      {/* ── Catch-all: redirect unknown paths to landing ── */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
+}
