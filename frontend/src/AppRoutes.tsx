@@ -42,6 +42,7 @@ import GraphPage from './pages/GraphPage'
 import YouTubePage from './pages/YouTubePage'
 import KeywordsPage from './pages/KeywordsPage'
 import DashboardPage from './pages/DashboardPage'
+import SerpIntelPage from './pages/SerpIntelPage'
 
 export default function AppRoutes() {
   return (
@@ -62,6 +63,7 @@ export default function AppRoutes() {
           <Route path="/app/analyze" element={<AnalyzePage />} />
           <Route path="/app/generate" element={<GeneratePage />} />
           <Route path="/app/intelligence" element={<QueryIntelPage />} />
+          <Route path="/app/serp-intel" element={<SerpIntelPage />} />
           <Route path="/app/graph" element={<GraphPage />} />
           <Route path="/app/youtube" element={<YouTubePage />} />
           <Route path="/app/keywords" element={<KeywordsPage />} />

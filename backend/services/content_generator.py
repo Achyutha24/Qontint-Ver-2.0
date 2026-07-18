@@ -43,19 +43,19 @@ def build_generation_prompt(
 
     return f"""You are a senior B2B content strategist for {vertical_display}.
 
-Write a focused, authoritative article for the keyword: "{keyword}"
+Write a highly detailed, comprehensive, and authoritative article for the keyword: "{keyword}"
 
 Naturally incorporate these key entities:
 {entity_context}
 
-Requirements:
-- 800–1200 words (concise but substantive)
-- Structure: Brief intro, 3 H2 sections, short conclusion
-- Include one specific data point or real-world example per section
-- B2B audience: decision-makers and practitioners
-- Tone: Direct, expert, no filler phrases{improvement_note}
+CRITICAL REQUIREMENTS (NON-NEGOTIABLE):
+1. LENGTH: You MUST write AT LEAST 1000 words. DO NOT write a short summary. This is a long-form article.
+2. STRUCTURE: Include a Title, Executive Summary, Introduction, 4 Detailed Main Sections, and Conclusion.
+3. DEPTH: Every main section must contain at least 3 detailed paragraphs with strategic insights, real-world examples, and data points.
+4. AUDIENCE: B2B decision-makers and practitioners.
+5. TONE: Direct, expert, highly professional, no fluff or filler phrases.{improvement_note}
 
-Write the article now:"""
+Write the complete, long-form article now:"""
 
 
 import httpx
@@ -63,11 +63,10 @@ import json
 
 # Models in priority order: primary, fallbacks
 _GEMINI_MODEL_FALLBACKS = [
-    "gemini-2.0-flash-lite",     # Gemini 2.0 Flash Lite (fastest, most quota)
-    "gemini-flash-latest",       # Gemini 2.5 Flash (thinking, fast)
-    "gemini-2.0-flash",          # Gemini 2.0 Flash
-    "gemini-1.5-flash-latest",   # Gemini 1.5 Flash (stable, high quota)
-    "gemini-1.5-flash-8b",       # Gemini 1.5 Flash 8B (highest free quota)
+    "gemini-2.5-flash",
+    "gemini-3.5-flash",
+    "gemini-2.5-pro",
+    "gemini-2.0-flash",
 ]
 
 
@@ -81,7 +80,7 @@ async def _call_gemini_model(model: str, prompt: str, max_tokens: int, key: str)
             "temperature": 0.7,
         },
     }
-    async with httpx.AsyncClient(timeout=min(settings.GEMINI_TIMEOUT, 15)) as client:
+    async with httpx.AsyncClient(timeout=min(settings.GEMINI_TIMEOUT, 30)) as client:
         response = await client.post(url, json=payload)
         status = response.status_code
         if status not in (200, 400, 403, 429):
@@ -304,6 +303,7 @@ async def generate_with_validation(
             )
             content = await call_gemini(
                 prompt,
+                max_tokens=4096,
                 keyword=keyword,
                 vertical=vertical,
                 top_entities=list(top_entities),
@@ -328,9 +328,16 @@ async def generate_with_validation(
         def _score_content(c: str) -> dict:
             analysis = build_content_analysis(c, keyword, vertical, serp_docs)
             scores = run_full_scoring(analysis)
+            
+            # Helper to extract float score from dict or float
+            def get_score(s):
+                if isinstance(s, dict):
+                    return float(s.get("score", 0.0))
+                return float(s or 0.0)
+                
             return {
                 "novelty": {
-                    "novelty_score": scores.novelty_score,
+                    "novelty_score": get_score(scores.novelty_score),
                     "similarity_score": scores.similarity_score,
                     "entity_novelty": scores.entity_novelty,
                     "relationship_novelty": scores.relationship_novelty,
@@ -344,7 +351,7 @@ async def generate_with_validation(
                 "authority": {
                     "matched_entities": scores.matched_entities,
                     "missing_entities": scores.missing_entities,
-                    "authority_score": scores.authority_score,
+                    "authority_score": get_score(scores.authority_score),
                 },
                 "ranking": {
                     "predicted_rank": scores.predicted_rank,
@@ -452,6 +459,53 @@ async def generate_competitor_comparison(
     top_3 = sorted(serp_docs, key=lambda x: getattr(x, "position", 99))[:3]
     if not top_3:
         return None
+        
+    fallback_dict = {
+        "overview": {
+            "keyword": keyword, 
+            "search_intent": "Unknown", 
+            "competition_level": "Unknown",
+            "average_word_count": "0",
+            "average_reading_time": "0 mins",
+            "average_seo_score": "0/100",
+            "average_semantic_coverage": "Unknown",
+            "average_entity_count": "0",
+            "difficulty": "Unknown",
+            "estimated_ranking_difficulty": "Unknown"
+        },
+        "top_competitors": [],
+        "summary_table": {
+            "our_article": {
+                "word_count": "0",
+                "search_intent_match": "Unknown",
+                "keyword_coverage": "Unknown",
+                "entity_coverage": "Unknown",
+                "semantic_coverage": "Unknown",
+                "topic_coverage": "Unknown",
+                "heading_structure": "Unknown",
+                "readability": "Unknown",
+                "content_depth": "Unknown",
+                "content_length": "Unknown",
+                "internal_linking_opportunities": "Unknown",
+                "missing_topics": "Unknown",
+                "missing_keywords": "Unknown",
+                "missing_entities": "Unknown",
+                "seo_strengths": "Unknown",
+                "seo_weaknesses": "Unknown",
+                "novelty_comparison": "Unknown",
+                "authority_comparison": "Unknown",
+                "predicted_ranking_difference": "Unknown",
+                "overall_competitive_score": "0/100"
+            },
+            "competitors": []
+        },
+        "recommendations": {
+            "competitor_1": [],
+            "competitor_2": [],
+            "competitor_3": [],
+            "overall_roadmap": {}
+        }
+    }
         
     import urllib.parse
     
@@ -600,54 +654,7 @@ The JSON object MUST exactly match this structure (fill in all string metrics wi
                 break
             logger.warning(f"Model {model} failed: {response[0]}")
             await asyncio.sleep(1)
-            
-        fallback_dict = {
-            "overview": {
-                "keyword": keyword, 
-                "search_intent": "Unknown", 
-                "competition_level": "Unknown",
-                "average_word_count": "0",
-                "average_reading_time": "0 mins",
-                "average_seo_score": "0/100",
-                "average_semantic_coverage": "Unknown",
-                "average_entity_count": "0",
-                "difficulty": "Unknown",
-                "estimated_ranking_difficulty": "Unknown"
-            },
-            "top_competitors": top_competitors,
-            "summary_table": {
-                "our_article": {
-                    "word_count": "0",
-                    "search_intent_match": "Unknown",
-                    "keyword_coverage": "Unknown",
-                    "entity_coverage": "Unknown",
-                    "semantic_coverage": "Unknown",
-                    "topic_coverage": "Unknown",
-                    "heading_structure": "Unknown",
-                    "readability": "Unknown",
-                    "content_depth": "Unknown",
-                    "content_length": "Unknown",
-                    "internal_linking_opportunities": "Unknown",
-                    "missing_topics": "Unknown",
-                    "missing_keywords": "Unknown",
-                    "missing_entities": "Unknown",
-                    "seo_strengths": "Unknown",
-                    "seo_weaknesses": "Unknown",
-                    "novelty_comparison": "Unknown",
-                    "authority_comparison": "Unknown",
-                    "predicted_ranking_difference": "Unknown",
-                    "overall_competitive_score": "0/100"
-                },
-                "competitors": []
-            },
-            "recommendations": {
-                "competitor_1": [],
-                "competitor_2": [],
-                "competitor_3": [],
-                "overall_roadmap": {}
-            }
-        }
-        
+        fallback_dict["top_competitors"] = top_competitors
         if text is None:
             logger.error("All Gemini models failed for competitor comparison.")
             return fallback_dict

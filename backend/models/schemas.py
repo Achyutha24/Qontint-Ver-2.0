@@ -276,22 +276,28 @@ class AnalyzeRequest(BaseModel):
     content: str = Field(..., min_length=50, max_length=100_000)
     keyword: str
     vertical: VerticalType
+    searchEngine: str = "Google"
+    country: str = "us"
+    language: str = "en"
+    device: str = "desktop"
 
 
 class CompetitorInfo(BaseModel):
-    title: str
-    website: str
-    url: str
-    meta_description: str
-    word_count: int
-    read_time: str
-    authority: float
-    seo_score: float
+    title: str | None = None
+    website: str | None = None
+    url: str | None = None
+    meta_description: str | None = None
+    word_count: int = 0
+    read_time: str | None = None
+    authority: float = 50.0
+    seo_score: float = 0.0
     author: str | None = None
     publish_date: str | None = None
     h1: str | None = None
-    h2s: list[str] | None = None
+    h2s: list[str] = []
     preview_text: str | None = None
+    favicon: str | None = None
+    snippet: str | None = None
 
 class ArticleMetrics(BaseModel):
     word_count: int | str
@@ -320,10 +326,10 @@ class ComparisonSummaryTable(BaseModel):
     competitors: list[ArticleMetrics]
 
 class AiRecommendations(BaseModel):
-    competitor_1: list[str]
-    competitor_2: list[str]
-    competitor_3: list[str]
-    overall_roadmap: dict[str, list[str]] # e.g. {"Critical": [], "High": [], "Medium": [], "Low": []}
+    competitor_1: list[str] = []
+    competitor_2: list[str] = []
+    competitor_3: list[str] = []
+    overall_roadmap: dict[str, list[str]] = {}
 
 class SerpOverview(BaseModel):
     keyword: str
@@ -343,15 +349,52 @@ class CompetitorComparisonResult(BaseModel):
     summary_table: ComparisonSummaryTable
     recommendations: AiRecommendations
 
+class SerpResult(BaseModel):
+    rank: int
+    title: str
+    url: str
+    domain: str
+    snippet: str
+    favicon: str | None = None
 
-class AnalyzeResponse(BaseModel):
-    novelty: NoveltyScoreResponse
-    ranking: RankingPredictResponse
-    authority: AuthorityCoverageResponse
-    recommendations: list[Recommendation]
-    competitor_comparison: CompetitorComparisonResult | None = None
-    total_processing_time_ms: int
-    loop_required: bool
+
+class ScoreWithConfidence(BaseModel):
+    score: float
+    confidence: float
+    reason: str
+
+class ContentScores(BaseModel):
+    seo: ScoreWithConfidence
+    novelty: ScoreWithConfidence
+    semantic_coverage: ScoreWithConfidence
+    intent_match: ScoreWithConfidence
+    authority: ScoreWithConfidence
+    overall: ScoreWithConfidence
+    
+class SERPIntelligenceAnalysis(BaseModel):
+    content_structure: dict = {}
+    topic_coverage: dict = {}
+    weak_areas: list[str] = []
+    keyword_analysis: dict = {}
+    readability: dict = {}
+    seo_analysis: dict = {}
+    entities: dict = {}
+    knowledge_gaps: dict = {}
+    knowledge_synthesis: dict = {}
+    recommendations: list[str] = []
+
+class UnifiedAnalysisResponse(BaseModel):
+    schema_version: str = "1.0"
+    analysis_version: str = "1.0"
+    generated_at: str
+    provider: str
+    cache_status: str
+    keyword: str
+    metadata: dict = {}
+    serp_results: list[SerpResult] = []
+    content_scores: ContentScores | None = None
+    serp_analysis: SERPIntelligenceAnalysis | dict = {}
+    report_metadata: dict = {}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

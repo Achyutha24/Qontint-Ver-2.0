@@ -256,13 +256,70 @@ async def get_top_authority_entities(
             
     return records
 
+def process_edges_for_quality(edge_records: list[dict], nodes: list[dict], max_degree: int = 30) -> list[dict]:
+    """
+    Apply graph quality improvements:
+    - Remove self-loops
+    - Remove duplicate edges (deterministic)
+    - Normalize weights (0.0 to 1.0)
+    - Limit dense neighborhoods to max_degree while preserving connectivity
+    """
+    unique_edges = {}
+    max_w = 0.0
+    
+    for e in edge_records:
+        s, t = e["source"], e["target"]
+        if s == t:
+            continue
+        
+        n1, n2 = sorted([s, t])
+        w = float(e.get("weight", 1.0))
+        
+        if (n1, n2) not in unique_edges:
+            unique_edges[(n1, n2)] = w
+        else:
+            unique_edges[(n1, n2)] = max(unique_edges[(n1, n2)], w)
+            
+        if unique_edges[(n1, n2)] > max_w:
+            max_w = unique_edges[(n1, n2)]
+            
+    normalized_edges = []
+    for (s, t), w in unique_edges.items():
+        norm_w = (w / max_w) if max_w > 0 else 0.1
+        normalized_edges.append({
+            "source": s,
+            "target": t,
+            "weight": norm_w,
+            "relation": "CO_OCCURS_WITH"
+        })
+        
+    normalized_edges.sort(key=lambda x: (x["weight"], x["source"], x["target"]), reverse=True)
+    
+    node_degree = {n["id"]: 0 for n in nodes}
+    filtered_edges = []
+    
+    for e in normalized_edges:
+        s, t = e["source"], e["target"]
+        if s not in node_degree: node_degree[s] = 0
+        if t not in node_degree: node_degree[t] = 0
+        
+        if node_degree[s] >= max_degree and node_degree[t] >= max_degree:
+            continue
+            
+        node_degree[s] += 1
+        node_degree[t] += 1
+        filtered_edges.append(e)
+        
+    filtered_edges.sort(key=lambda x: (x["source"], x["target"]))
+    return filtered_edges
+
 async def get_full_graph_snapshot(vertical: str, limit: int = 200) -> dict[str, Any]:
     """Get nodes and edges for the full graph visualization."""
     node_records = await run_query(
         """
         MATCH (e:Entity {vertical: $vertical})
         RETURN e.id AS id, e.text AS label, e.type AS type, 
-               e.authority_score AS authority, e.vertical AS vertical
+               coalesce(e.authority_score, e.frequency/10.0, 0.1) AS authority, coalesce(e.authority_score, e.frequency/10.0, 0.1) AS authority_score, e.vertical AS vertical
         ORDER BY e.authority_score DESC LIMIT $limit
         """,
         {"vertical": vertical, "limit": limit}
@@ -285,7 +342,7 @@ async def get_full_graph_snapshot(vertical: str, limit: int = 200) -> dict[str, 
             entities = node_res.scalars().all()
             node_records = [
                 {"id": e.id, "label": e.text, "type": e.entity_type, 
-                 "authority": e.authority_score, "vertical": e.vertical}
+                 "authority": float(e.authority_score or min((e.frequency or 1) / 10.0, 1.0)), "vertical": e.vertical}
                 for e in entities
             ]
             node_ids = [e.id for e in entities]
@@ -325,10 +382,9 @@ async def get_full_graph_snapshot(vertical: str, limit: int = 200) -> dict[str, 
                         "relation": "CO_OCCURS_WITH"
                     })
             
-            return {
-                "nodes": node_records,
-                "edges": edge_records
-            }
+            node_records.sort(key=lambda x: x["id"])
+            edge_records = process_edges_for_quality(edge_records, node_records)
+            return enrich_graph_with_metrics(node_records, edge_records)
 
     node_ids = [r["id"] for r in node_records]
     
@@ -341,7 +397,38 @@ async def get_full_graph_snapshot(vertical: str, limit: int = 200) -> dict[str, 
         {"ids": node_ids}
     )
     
+    node_records.sort(key=lambda x: x["id"])
+    edge_records = process_edges_for_quality(edge_records, node_records)
+    return enrich_graph_with_metrics(node_records, edge_records)
+
+def enrich_graph_with_metrics(nodes: list[dict], edges: list[dict]) -> dict:
+    import networkx as nx
+    from networkx.algorithms.community import greedy_modularity_communities
+    
+    G = nx.Graph()
+    for n in nodes:
+        G.add_node(n["id"])
+    for e in edges:
+        G.add_edge(e["source"], e["target"], weight=e.get("weight", 1.0))
+        # Ensure relationship_weight is exposed
+        e["relationship_weight"] = e.get("weight", 1.0)
+        
+    try:
+        communities = list(greedy_modularity_communities(G))
+        cluster_map = {}
+        for i, c in enumerate(communities):
+            for node_id in c:
+                cluster_map[node_id] = i
+    except Exception:
+        cluster_map = {}
+
+    for n in nodes:
+        n["degree"] = G.degree(n["id"]) if n["id"] in G else 0
+        n["cluster_id"] = cluster_map.get(n["id"], 0)
+        n["pagerank"] = n.get("authority", 0.1)
+        n["authority_score"] = n.get("authority", 0.1)
+        
     return {
-        "nodes": node_records,
-        "edges": edge_records
+        "nodes": nodes,
+        "edges": edges
     }

@@ -183,3 +183,124 @@ class ModelVersion(Base):
     __table_args__ = (
         UniqueConstraint("vertical", "version_tag", name="uq_model_version"),
     )
+
+# ── Advanced Caching & History (SERP Intel) ───────────────────────────────────
+
+class SearchHistory(Base):
+    __tablename__ = "search_history"
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    user_id = Column(String(36), nullable=True)
+    keyword = Column(Text, nullable=False, index=True)
+    normalized_keyword = Column(Text, nullable=False, index=True)
+    page_name = Column(String(100))
+    search_engine = Column(String(100))
+    country = Column(String(10))
+    language = Column(String(10))
+    device = Column(String(20))
+    searched_at = Column(DateTime, server_default=func.now())
+    last_accessed = Column(DateTime, server_default=func.now())
+    access_count = Column(Integer, default=1)
+    cache_key = Column(String(255), index=True)
+    analysis_id = Column(String(36))
+    session_id = Column(String(100))
+    analysis_duration_ms = Column(Integer)
+    provider_used = Column(String(100))
+    cache_status = Column(String(50))
+    is_favorite = Column(Boolean, default=False)
+    is_pinned = Column(Boolean, default=False)
+    is_deleted = Column(Boolean, default=False)
+    status = Column(String(50), default="COMPLETED")
+
+class AnalysisCache(Base):
+    __tablename__ = "analysis_cache"
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    cache_key = Column(String(255), unique=True, index=True)
+    keyword = Column(Text, nullable=False)
+    serp_results_json = Column(Text)
+    top_3_json = Column(Text)
+    extracted_content_json = Column(Text)
+    entity_analysis_json = Column(Text)
+    seo_score = Column(Float)
+    novelty_score = Column(Float)
+    ranking_prediction_json = Column(Text)
+    ai_summary = Column(Text)
+    recommendations_json = Column(Text)
+    website_authority_json = Column(Text)
+    content_metadata_json = Column(Text)
+    provider_info = Column(String(100))
+    status = Column(String(50), default="PENDING") # e.g., SERP_FETCHED, CONTENT_EXTRACTED, AI_COMPLETE, FAILED
+    raw_serp_response_json = Column(Text)
+    credits_consumed = Column(Integer, default=0)
+    response_time_ms = Column(Integer, default=0)
+    error_log = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())
+    expiry_time = Column(DateTime)
+class ContentStorage(Base):
+    __tablename__ = "content_storage"
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    url = Column(Text, nullable=False, unique=True, index=True)
+    content_hash = Column(String(64), index=True)
+    downloaded_html = Column(Text)
+    extracted_text = Column(Text)
+    word_count = Column(Integer)
+    entity_graph_json = Column(Text)
+    metadata_json = Column(Text)
+    http_status = Column(Integer)
+    extraction_time_ms = Column(Integer)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now())
+    last_modified_header = Column(String(100))
+    etag_header = Column(String(100))
+
+class ReportStorage(Base):
+    __tablename__ = "report_storage"
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    analysis_id = Column(String(36), index=True)
+    report_json = Column(Text, nullable=False)
+    report_version = Column(String(50))
+    schema_version = Column(String(50))
+    prompt_version = Column(String(50))
+    serp_provider_version = Column(String(50))
+    gemini_version = Column(String(50))
+    gemini_model = Column(String(50))
+    prompt_hash = Column(String(64))
+    temperature = Column(Float)
+    max_tokens = Column(Integer)
+    generation_time_ms = Column(Integer)
+    created_at = Column(DateTime, server_default=func.now())
+
+class ProviderHealth(Base):
+    __tablename__ = "provider_health"
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    provider_name = Column(String(100), unique=True, index=True)
+    success_rate = Column(Float, default=100.0)
+    average_response_time_ms = Column(Integer, default=0)
+    failure_count = Column(Integer, default=0)
+    rate_limit_count = Column(Integer, default=0)
+    current_health_status = Column(String(50), default="HEALTHY")
+    last_successful_request = Column(DateTime)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now())
+
+class CacheAnalytics(Base):
+    __tablename__ = "cache_analytics"
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    date_key = Column(String(20), unique=True, index=True)
+    cache_hits = Column(Integer, default=0)
+    cache_misses = Column(Integer, default=0)
+    credits_saved = Column(Integer, default=0)
+    gemini_calls_saved = Column(Integer, default=0)
+    avg_analysis_time_ms = Column(Integer, default=0)
+    avg_serp_response_time_ms = Column(Integer, default=0)
+    avg_gemini_response_time_ms = Column(Integer, default=0)
+
+class ApiUsageMetrics(Base):
+    __tablename__ = "api_usage_metrics"
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    date_key = Column(String(20), unique=True, index=True)
+    total_requests = Column(Integer, default=0)
+    serp_requests = Column(Integer, default=0)
+    gemini_requests = Column(Integer, default=0)
+    retries = Column(Integer, default=0)
+    rate_limits = Column(Integer, default=0)
+    remaining_credits = Column(Integer, default=0)

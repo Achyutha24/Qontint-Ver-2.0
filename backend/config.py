@@ -30,8 +30,8 @@ class Settings(BaseSettings):
 
     # ── Gemini API (AI Content) ─────────────────────────────────────────────
     GOOGLE_API_KEY: str | None = None
-    GEMINI_MODEL: str = "gemini-1.5-flash-8b"
-    GEMINI_TIMEOUT: int = 25
+    GEMINI_MODEL: str = "gemini-flash-latest"
+    GEMINI_TIMEOUT: int = 30
 
     # ── SERP Scraper ──────────────────────────────────────────────────────────
     SCRAPER_DELAY_MS: int = 0
@@ -39,10 +39,11 @@ class Settings(BaseSettings):
     SCRAPER_HEADLESS: bool = True
     SCRAPER_PROXY_URL: str | None = None
     TAVILY_API_KEY: str | None = None
+    SERPER_API_KEY: str | None = None
 
     # ── Analyze fast-path (target <15s end-to-end) ────────────────────────────
-    ANALYZE_SERP_MAX_RESULTS: int = 2
-    ANALYZE_SERP_TIMEOUT_MS: int = 2500
+    ANALYZE_SERP_MAX_RESULTS: int = 4
+    ANALYZE_SERP_TIMEOUT_MS: int = 5000
     ANALYZE_SERP_BODY_MAX_CHARS: int = 8_000
     ANALYZE_MAX_SERP_DOCS: int = 5
     ANALYZE_NLP_MAX_LEN: int = 1_500
@@ -61,6 +62,19 @@ class Settings(BaseSettings):
     RATE_LIMIT_DEFAULT: str = "60/minute"
     RATE_LIMIT_SERP: str = "10/minute"
     RATE_LIMIT_GENERATE: str = "5/minute"
+
+    # ── Competitor Filtering ──────────────────────────────────────────────────
+    EXCLUDED_SERP_DOMAINS: list = Field(
+        default=[
+            "wikipedia.org", "reddit.com", "youtube.com", "youtu.be",
+            "quora.com", "stackoverflow.com", "github.com", "medium.com",
+            "linkedin.com", "facebook.com", "instagram.com", "x.com",
+            "twitter.com", "threads.net", "tiktok.com", "pinterest.com",
+            "docs.", "developer.", "support.", "community.", "forum.",
+            "help.", "knowledgebase.", "wiki."
+        ]
+    )
+
 
 
 settings = Settings()

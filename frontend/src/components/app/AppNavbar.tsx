@@ -7,13 +7,14 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Cpu, Zap, Brain, Network, Video, BarChart3, LayoutDashboard, Menu, X } from 'lucide-react'
+import { Cpu, Zap, Brain, Network, Video, BarChart3, LayoutDashboard, Menu, X, Globe } from 'lucide-react'
 import WorkspaceDropdown from '../ui/WorkspaceDropdown'
 
 const APP_NAV_ITEMS = [
   { to: '/app/analyze',      label: 'Analyze',      icon: Cpu },
   { to: '/app/generate',     label: 'Generate',     icon: Zap },
   { to: '/app/intelligence', label: 'Intelligence', icon: Brain },
+  { to: '/app/serp-intel',   label: 'SERP Intelligence', icon: Globe },
   { to: '/app/graph',        label: 'Graph',        icon: Network },
   { to: '/app/youtube',      label: 'YouTube',      icon: Video },
   { to: '/app/keywords',     label: 'Keywords',     icon: BarChart3 },

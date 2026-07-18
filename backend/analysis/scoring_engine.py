@@ -89,28 +89,35 @@ class ContentAnalysis:
 
 @dataclass
 class FullScoreResult:
-    novelty_score: float  # 0-1
-    similarity_score: float  # 0-1
-    entity_novelty: float  # 0-1
-    relationship_novelty: float  # 0-1
-    semantic_diversity: float  # 0-1
+    novelty_score: dict
+    similarity_score: float
+    entity_novelty: float
+    relationship_novelty: float
+    semantic_diversity: float
     passed: bool
     threshold: float
     verdict: str
     reasoning: list[str]
     formula: str
 
-    authority_score: float
+    authority_score: dict
     matched_entities: list[str]
     missing_entities: list[str]
 
     predicted_rank: int
+    expected_position_range: str
     confidence: float
+    ranking_probability: float
+    competition_difficulty: float
+    content_gap: float
     ranking_factors: dict[str, float]
     optimization_gaps: list[str]
 
-    seo_score: float
-    intent_match: float
+    seo_score: dict
+    intent_match: dict
+    semantic_coverage: dict
+    overall_score: dict
+    readability_score: dict
 
     serp_grounded: bool
     debug: dict[str, Any]
@@ -468,7 +475,7 @@ def score_ranking(
         else relationship_novelty * 0.8
     )
 
-    serp_difficulty = clamp01(0.35 + analysis.mean_semantic_similarity * 0.5)
+    competition_difficulty = clamp01(0.35 + analysis.mean_semantic_similarity * 0.5 + (len(analysis.serp_pages)/10.0)*0.15)
     semantic_similarity = analysis.max_semantic_similarity
 
     features = {
@@ -481,10 +488,10 @@ def score_ranking(
         "keyword_density": analysis.keyword_density,
         "topical_authority": authority_score,
         "relationship_density": relationship_density,
-        "SERP_difficulty": serp_difficulty,
+        "competition_difficulty": competition_difficulty,
     }
 
-    # Deterministic rank formula (no random ML)
+    # Deterministic rank formula
     strength = (
         authority_score * 0.22
         + novelty_score * 0.20
@@ -493,11 +500,18 @@ def score_ranking(
         + (1.0 - semantic_similarity) * 0.11
         + min(analysis.word_count / 1500.0, 1.0) * 0.10
         + min(analysis.heading_depth / 4.0, 1.0) * 0.05
-        - serp_difficulty * 0.10
+        - competition_difficulty * 0.10
     )
     strength = clamp01(strength)
     predicted_rank = int(round(100 - strength * 88))
     predicted_rank = max(1, min(100, predicted_rank))
+    
+    content_gap = clamp01(1.0 - (authority_score * 0.5 + relationship_density * 0.5))
+    ranking_probability = clamp01(strength * 1.2)
+    
+    range_low = max(1, predicted_rank - 2)
+    range_high = min(100, predicted_rank + 3)
+    expected_position_range = f"{range_low}-{range_high}"
 
     # Penalties
     gaps: list[str] = []
@@ -517,7 +531,7 @@ def score_ranking(
         predicted_rank = min(100, predicted_rank + 10)
         gaps.append("High semantic overlap with existing SERP content")
 
-    # Confidence from data quality (not random)
+    # Confidence from data quality
     confidence = 0.35
     if analysis.serp_grounded:
         confidence += 0.25
@@ -537,78 +551,108 @@ def score_ranking(
 
     return {
         "predicted_rank": predicted_rank,
+        "expected_position_range": expected_position_range,
         "confidence": confidence,
+        "ranking_probability": ranking_probability,
+        "competition_difficulty": competition_difficulty,
+        "content_gap": content_gap,
         "ranking_factors": {k: round(v, 3) if isinstance(v, float) else v for k, v in features.items()},
         "optimization_gaps": gaps,
         "reasoning": reasoning,
-        "model_version": "deterministic_serp_v2",
+        "model_version": "deterministic_serp_v3",
     }
 
 
 def run_full_scoring(analysis: ContentAnalysis) -> FullScoreResult:
-    novelty = score_novelty(analysis)
-    authority = score_authority(analysis)
-    ranking = score_ranking(
-        analysis,
-        novelty_score=novelty["novelty_score"],
-        authority_score=authority["authority_score"],
-        relationship_novelty=novelty["relationship_novelty"],
-    )
+    # --- Confidence Calculation ---
+    base_confidence = 100.0 if analysis.serp_grounded else 30.0
+    doc_factor = min(1.0, analysis.serp_doc_count / 3.0)
+    word_factor = min(1.0, sum(len(c.split()) for c in analysis.serp_corpus) / 3000.0) if analysis.serp_corpus else 0.1
+    confidence_val = round(base_confidence * doc_factor * word_factor, 1)
+    
+    if confidence_val < 40.0:
+        conf_reason = "Low confidence due to limited extracted competitor content."
+    elif confidence_val < 70.0:
+        conf_reason = "Moderate confidence; some competitor content was extracted but depth is limited."
+    else:
+        conf_reason = "High confidence based on robust competitor data extraction."
 
-    logger.info(
-        "Scoring complete keyword=%s serp_docs=%d novelty=%.2f authority=%.2f rank=%d",
-        analysis.keyword,
-        analysis.serp_doc_count,
-        novelty["novelty_score"],
-        authority["authority_score"],
-        ranking["predicted_rank"],
-    )
+    def make_score(val, label=""):
+        return {"score": round(val, 1), "confidence": confidence_val, "reason": conf_reason if not label else label}
 
-    # SEO Score calculation
-    seo_score = 30.0
-    if analysis.word_count > 1000:
-        seo_score += 20
-    elif analysis.word_count > 500:
-        seo_score += 10
-    if analysis.heading_depth > 3:
-        seo_score += 15
-    if analysis.keyword_density >= 0.005 and analysis.keyword_density <= 0.03:
-        seo_score += 15
-    seo_score += authority["authority_score"] * 20
-    seo_score = min(seo_score, 100.0)
+    # --- Novelty Score ---
+    novelty_base = 50.0
+    sim_penalty = max(0, (analysis.max_semantic_similarity - 0.7) * 50)
+    ent_nov = min(20.0, len(analysis.content_entity_set - analysis.serp_entity_set))
+    svo_nov = min(20.0, len(analysis.content_svo_set - analysis.serp_svo_set))
+    novelty = clamp_score_100(novelty_base - sim_penalty + ent_nov + svo_nov)
 
-    # Intent Match calculation
-    intent_match = 50.0
-    if analysis.serp_grounded:
-        intent_match += analysis.mean_semantic_similarity * 40
-    intent_match = min(intent_match + (authority["authority_score"] * 10), 100.0)
+    # --- SEO Score ---
+    seo_val = clamp_score_100(40 + (analysis.keyword_density * 1000) + (analysis.heading_depth * 5) + min(20, analysis.word_count / 50))
+
+    # --- Semantic Coverage ---
+    matched_ent = analysis.content_entity_set.intersection(analysis.serp_entity_set)
+    coverage_val = clamp_score_100(len(matched_ent) / max(1, len(analysis.serp_entity_set)) * 100 + 20)
+
+    # --- Intent Match ---
+    intent_val = clamp_score_100(60 + (analysis.mean_semantic_similarity * 40))
+
+    # --- Authority ---
+    auth_matched = [e["text"] for e in analysis.serp_authority_entities if e["text"] in analysis.content_entity_set]
+    auth_missing = [e["text"] for e in analysis.serp_authority_entities if e["text"] not in analysis.content_entity_set]
+    auth_val = clamp_score_100(len(auth_matched) / max(1, len(analysis.serp_authority_entities)) * 100)
+
+    # --- Overall ---
+    overall_val = clamp_score_100((novelty * 0.2) + (seo_val * 0.2) + (coverage_val * 0.2) + (intent_val * 0.2) + (auth_val * 0.2))
+
+    # --- Readability Score (Flesch Reading Ease → 0-100, higher = more readable) ---
+    try:
+        import textstat
+        # Flesch Reading Ease: 0 (very hard) → 100 (very easy)
+        # We normalise it directly to a 0-100 score.
+        fre = textstat.flesch_reading_ease(analysis.content[:20_000])
+        # Clamp to 0-100 (FRE can go slightly negative or above 100)
+        readability_val = clamp_score_100(fre)
+        readability_label = (
+            "Excellent" if readability_val >= 80 else
+            "Good" if readability_val >= 60 else
+            "Moderate" if readability_val >= 40 else
+            "Difficult"
+        )
+    except Exception:
+        # Fallback: estimate from word count / heading depth heuristic
+        avg_word_len = sum(len(w) for w in analysis.content.split()) / max(len(analysis.content.split()), 1)
+        readability_val = clamp_score_100(100 - (avg_word_len - 3) * 15)
+        readability_label = "Moderate"
 
     return FullScoreResult(
-        novelty_score=novelty["novelty_score"],
-        similarity_score=novelty["similarity_score"],
-        entity_novelty=novelty["entity_novelty"],
-        relationship_novelty=novelty["relationship_novelty"],
-        semantic_diversity=novelty["semantic_diversity"],
-        passed=novelty["passed"],
-        threshold=novelty["threshold"],
-        verdict=novelty["verdict"],
-        reasoning=novelty["reasoning"] + authority.get("reasoning", [])[:1],
-        formula=novelty["formula"],
-        authority_score=authority["authority_score"],
-        matched_entities=authority["matched_entities"],
-        missing_entities=authority["missing_entities"],
-        predicted_rank=ranking["predicted_rank"],
-        confidence=ranking["confidence"],
-        ranking_factors=ranking["ranking_factors"],
-        optimization_gaps=ranking["optimization_gaps"],
-        seo_score=seo_score,
-        intent_match=intent_match,
+        novelty_score=make_score(novelty),
+        similarity_score=analysis.max_semantic_similarity,
+        entity_novelty=ent_nov/20.0,
+        relationship_novelty=svo_nov/20.0,
+        semantic_diversity=1.0 - analysis.mean_semantic_similarity,
+        passed=novelty >= 70,
+        threshold=70.0,
+        verdict="Pass" if novelty >= 70 else "Needs Improvement",
+        reasoning=[f"Calculated from similarity penalties and structural divergence."],
+        formula="Base + Entities + SVO - Similarity",
+        authority_score=make_score(auth_val),
+        matched_entities=auth_matched,
+        missing_entities=auth_missing,
+        predicted_rank=1 if overall_val > 80 else (3 if overall_val > 60 else 10),
+        expected_position_range="1-3" if overall_val > 80 else "4-10",
+        confidence=confidence_val,
+        ranking_probability=overall_val / 100.0,
+        competition_difficulty=100 - auth_val,
+        content_gap=100 - coverage_val,
+        ranking_factors={"seo": seo_val, "authority": auth_val},
+        optimization_gaps=auth_missing[:3],
+        seo_score=make_score(seo_val),
+        intent_match=make_score(intent_val),
+        semantic_coverage=make_score(coverage_val),
+        overall_score=make_score(overall_val),
+        readability_score=make_score(readability_val, readability_label),
         serp_grounded=analysis.serp_grounded,
-        debug={
-            "serp_doc_count": analysis.serp_doc_count,
-            "content_entities": len(analysis.content_entity_set),
-            "content_svo_triples": len(analysis.content_svo_set),
-            "serp_entities": len(analysis.serp_entity_set),
-            "max_semantic_similarity": analysis.max_semantic_similarity,
-        },
+        debug=analysis.debug
     )
+

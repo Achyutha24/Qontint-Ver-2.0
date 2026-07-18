@@ -1,144 +1,181 @@
 import abc
 import logging
 import httpx
-from typing import Any, List, Dict
+from typing import Any, List, Dict, Optional
+from datetime import datetime, timedelta
 import asyncio
-from bs4 import BeautifulSoup
-from ddgs import DDGS
-from fastapi import HTTPException
+import os
+import urllib.parse
 from config import settings
 
 logger = logging.getLogger(__name__)
 
-class SerpProvider(abc.ABC):
+class ProviderHealthManager:
+    """Manages the health status of search providers."""
+    def __init__(self):
+        self.stats = {}
+
+    def get_stats(self, provider_name: str) -> dict:
+        if provider_name not in self.stats:
+            self.stats[provider_name] = {
+                "success_count": 0,
+                "failure_count": 0,
+                "consecutive_failures": 0,
+                "rate_limit_count": 0,
+                "last_successful_request": None,
+                "is_disabled_until": None
+            }
+        return self.stats[provider_name]
+
+    def record_success(self, provider_name: str):
+        stats = self.get_stats(provider_name)
+        stats["success_count"] += 1
+        stats["consecutive_failures"] = 0
+        stats["last_successful_request"] = datetime.now()
+
+    def record_failure(self, provider_name: str, is_rate_limit: bool = False):
+        stats = self.get_stats(provider_name)
+        stats["failure_count"] += 1
+        stats["consecutive_failures"] += 1
+        if is_rate_limit:
+            stats["rate_limit_count"] += 1
+            # Backoff for 1 minute on rate limit
+            stats["is_disabled_until"] = datetime.now() + timedelta(minutes=1)
+        elif stats["consecutive_failures"] >= 3:
+            # Backoff for 5 minutes after 3 consecutive failures
+            stats["is_disabled_until"] = datetime.now() + timedelta(minutes=5)
+
+    def is_healthy(self, provider_name: str) -> bool:
+        stats = self.get_stats(provider_name)
+        if stats["is_disabled_until"] and datetime.now() < stats["is_disabled_until"]:
+            return False
+        return True
+
+provider_health_manager = ProviderHealthManager()
+
+
+class SERPProvider(abc.ABC):
+    name: str
+
     @abc.abstractmethod
-    async def search(self, query: str, max_results: int = 3) -> List[Dict[str, Any]]:
+    async def search(self, query: str, country: str = "us", language: str = "en", max_results: int = 10) -> Dict[str, Any]:
         """
-        Returns a list of structured SERP results:
+        Returns a dictionary containing:
+        Returns a list of SERP results without extracting body content:
         [
             {
                 "title": "Page Title",
                 "url": "https://example.com",
-                "meta_description": "Snippet...",
-                "body_content": "Extracted main content...",
+                "snippet": "Snippet...",
                 "position": 1,
-                "website_name": "Example",
-                "featured_image": "url",
-                "author": "Name",
-                "publish_date": "2023-01-01"
-            },
-            ...
+                "website_name": "Example"
+            }
         ]
         """
         pass
 
-class TavilySerpProvider(SerpProvider):
-    async def search(self, query: str, max_results: int = 3) -> List[Dict[str, Any]]:
-        if not settings.TAVILY_API_KEY:
-            logger.warning("TAVILY_API_KEY is not set. Tavily search aborted.")
-            return []
-            
-        url = "https://api.tavily.com/search"
+
+class SerperProvider(SERPProvider):
+    name = "Serper.dev"
+
+    async def search(self, query: str, country: str = "us", language: str = "en", max_results: int = 10) -> Dict[str, Any]:
+        api_key = getattr(settings, "SERPER_API_KEY", os.environ.get("SERPER_API_KEY"))
+        if not api_key:
+            raise ValueError("SERPER_API_KEY is not set. Please add it to your .env file.")
+
+        url = "https://google.serper.dev/search"
         payload = {
-            "api_key": settings.TAVILY_API_KEY,
-            "query": query,
-            "search_depth": "advanced",
-            "include_images": True,
-            "include_raw_content": True,
-            "max_results": max_results,
-            "include_domains": [],
-            "exclude_domains": []
+            "q": query,
+            "gl": country,
+            "hl": language,
+            "num": max_results
         }
-        
+        headers = {
+            "X-API-KEY": api_key,
+            "Content-Type": "application/json"
+        }
+
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(url, json=payload)
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.post(url, headers=headers, json=payload)
+                if response.status_code == 429:
+                    provider_health_manager.record_failure(self.name, is_rate_limit=True)
+                    raise Exception("Rate limited by Serper.dev")
                 response.raise_for_status()
                 data = response.json()
-                
+
                 results = []
-                for idx, result in enumerate(data.get("results", [])):
-                    import urllib.parse
-                    parsed_url = urllib.parse.urlparse(result.get("url", ""))
+                for idx, result in enumerate(data.get("organic", [])[:max_results]):
+                    parsed_url = urllib.parse.urlparse(result.get("link", ""))
                     website_name = parsed_url.netloc.replace("www.", "")
                     
                     results.append({
                         "title": result.get("title", ""),
-                        "url": result.get("url", ""),
-                        "meta_description": result.get("content", ""),
-                        "body_content": result.get("raw_content", result.get("content", "")),
-                        "position": idx + 1,
-                        "website_name": website_name,
-                        "featured_image": None,
-                        "author": "Unknown",
-                        "publish_date": result.get("published_date", "")
+                        "url": result.get("link", ""),
+                        "snippet": result.get("snippet", ""),
+                        "position": result.get("position", idx + 1),
+                        "website_name": website_name
                     })
-                return results[:max_results]
+                
+                provider_health_manager.record_success(self.name)
+                return {
+                    "results": results,
+                    "raw_response": data,
+                    "credits": 1,
+                    "provider": self.name
+                }
+
         except Exception as e:
-            logger.error(f"Error calling Tavily API: {e}")
-            return []
+            provider_health_manager.record_failure(self.name)
+            logger.error(f"SerperProvider search failed: {str(e)}")
+            raise e
 
-class DuckDuckGoSerpProvider(SerpProvider):
-    async def _fetch_html(self, client: httpx.AsyncClient, url: str) -> str:
+class DuckDuckGoProvider(SERPProvider):
+    name = "DuckDuckGo"
+
+    async def search(self, query: str, country: str = "us", language: str = "en", max_results: int = 10) -> Dict[str, Any]:
+        # Fallback provider if Serper fails or has no key
+        from ddgs import DDGS
         try:
-            resp = await client.get(url, follow_redirects=True, timeout=10.0)
-            resp.raise_for_status()
-            return resp.text
-        except Exception as e:
-            logger.warning(f"Error fetching URL {url}: {e}")
-            return ""
-
-    def _extract_text(self, html: str) -> str:
-        if not html: return ""
-        soup = BeautifulSoup(html, "html.parser")
-        for tag in soup(["script", "style", "nav", "footer", "header"]):
-            tag.decompose()
-        return soup.get_text(separator=" ", strip=True)
-
-    async def search(self, query: str, max_results: int = 3) -> List[Dict[str, Any]]:
-        logger.info(f"Using DuckDuckGo to search for: {query}")
-        try:
-            def _ddg():
-                with DDGS() as ddgs:
-                    return list(ddgs.text(query, max_results=max_results))
+            loop = asyncio.get_event_loop()
+            def fetch():
+                return list(DDGS(timeout=10).text(query, max_results=max_results))
             
-            raw_results = await asyncio.to_thread(_ddg)
-            if not raw_results:
-                return []
-                
-            async with httpx.AsyncClient(verify=False) as client:
-                html_tasks = [self._fetch_html(client, r.get("href", "")) for r in raw_results]
-                html_contents = await asyncio.gather(*html_tasks)
-                
+            raw_results = await loop.run_in_executor(None, fetch)
+            
             results = []
-            import urllib.parse
-            for idx, (result, html) in enumerate(zip(raw_results, html_contents)):
-                url = result.get("href", "")
-                parsed_url = urllib.parse.urlparse(url)
+            for idx, result in enumerate(raw_results):
+                parsed_url = urllib.parse.urlparse(result.get("href", ""))
                 website_name = parsed_url.netloc.replace("www.", "")
-                
-                body = self._extract_text(html)
-                if len(body) < 100:
-                    body = result.get("body", "")
-                    
                 results.append({
                     "title": result.get("title", ""),
-                    "url": url,
-                    "meta_description": result.get("body", ""),
-                    "body_content": body,
+                    "url": result.get("href", ""),
+                    "snippet": result.get("body", ""),
                     "position": idx + 1,
-                    "website_name": website_name,
-                    "featured_image": None,
-                    "author": "Unknown",
-                    "publish_date": ""
+                    "website_name": website_name
                 })
-                
-            return results[:max_results]
+            
+            provider_health_manager.record_success(self.name)
+            return {
+                "results": results,
+                "raw_response": raw_results,
+                "credits": 0,
+                "provider": self.name
+            }
         except Exception as e:
-            logger.error(f"Error calling DuckDuckGo: {e}")
-            return []
+            provider_health_manager.record_failure(self.name)
+            logger.error(f"DuckDuckGo search failed: {str(e)}")
+            raise e
 
-def get_serp_provider() -> SerpProvider:
-    if settings.TAVILY_API_KEY:
-        return TavilySerpProvider()
-    return DuckDuckGoSerpProvider()
+
+def get_serp_provider() -> SERPProvider:
+    provider_name = os.environ.get("SERP_PROVIDER", "serper").lower()
+    
+    if provider_name == "serper":
+        provider = SerperProvider()
+        if not provider_health_manager.is_healthy(provider.name):
+            logger.warning("Serper is unhealthy. Falling back to DuckDuckGo.")
+            return DuckDuckGoProvider()
+        return provider
+    
+    return DuckDuckGoProvider()
