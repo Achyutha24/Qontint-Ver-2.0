@@ -1,10 +1,10 @@
-import { useRef, useMemo } from 'react'
+﻿import { useRef, useMemo } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
 const PARTICLE_COLORS = [
   new THREE.Color('#FF5E3A'), // Sunset Coral
-  new THREE.Color('#4f8ef7'), // Blue
+  new THREE.Color('#D69A6A'), // Solar Orange (was Blue — replaced for brand consistency)
   new THREE.Color('#FFB347'), // Amber
 ]
 

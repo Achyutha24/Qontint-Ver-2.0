@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { CheckCircle, AlertTriangle, BarChart2, Target, Shield, Info, ChevronDown, ChevronUp } from 'lucide-react'
 
 export type AnalyzeResult = {
+  keyword?: string
   novelty: {
     novelty_score: number
     similarity_score: number
@@ -70,6 +71,7 @@ export function normalizeAnalyzeResponse(raw: Record<string, unknown>): AnalyzeR
     (gaps.length > 0 ? gaps[0] : 'Content meets baseline ranking signals.')
 
   return {
+    keyword: (raw.keyword as string | undefined) || undefined,
     novelty,
     ranking: {
       predicted_rank: predictedRank,

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+﻿import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, X, Target } from 'lucide-react'
 import * as THREE from 'three'
@@ -184,14 +184,14 @@ export default function KeywordsPage() {
     const stars: THREE.Mesh[] = []
     
     const darkCols = {
-      High:   new THREE.Color('#c8722a'), // Solar
-      Medium: new THREE.Color('#d4956a'), // Aurora
-      Low:    new THREE.Color('#e8c080')  // Stellar
+      High:   new THREE.Color('#D69A6A'), // Solar
+      Medium: new THREE.Color('#E8894A'), // Aurora
+      Low:    new THREE.Color('#E3B06B')  // Stellar
     }
     const lightCols = {
-      High:   new THREE.Color('#e8a020'), // Solar
-      Medium: new THREE.Color('#d4813a'), // Aurora
-      Low:    new THREE.Color('#5a8a6e')  // Stellar/Sage
+      High:   new THREE.Color('#E3B06B'), // Solar
+      Medium: new THREE.Color('#E8894A'), // Aurora
+      Low:    new THREE.Color('#E3B06B')  // warm amber-gold (was sage)
     }
     const colors = isDark ? darkCols : lightCols
 
@@ -227,7 +227,7 @@ export default function KeywordsPage() {
 
     // Constellation Lines
     const lineMat = new THREE.LineBasicMaterial({ 
-      color: isDark ? 0xd4956a : 0xd4813a, 
+      color: isDark ? 0xE8894A : 0xE8894A, 
       transparent: true, 
       opacity: isDark ? 0.15 : 0.2 
     })

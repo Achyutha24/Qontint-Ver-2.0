@@ -26,11 +26,27 @@ def _generate_response(result: dict, status_code: int = 200) -> JSONResponse:
         except (TypeError, ValueError):
             predicted = None
 
+    # Defensive guard — the root cause is fixed in scoring_engine.py and
+    # content_generator.py (run_full_scoring now returns 0-1 consistently).
+    # This guard is a secondary safety net: if any unforeseen code path
+    # returns a value outside [0,1], we normalise it rather than crash.
+    raw_novelty = float(result.get("novelty_score") or 0.0)
+    if raw_novelty > 1.0:
+        # Value arrived on a 0-100 scale — normalise to 0-1
+        logger.warning(
+            "novelty_score arrived as %.4f (>1.0) — normalising to 0-1 scale. "
+            "This should not happen after the root-cause fix in scoring_engine.py.",
+            raw_novelty,
+        )
+        novelty_score = max(0.0, min(1.0, raw_novelty / 100.0))
+    else:
+        novelty_score = max(0.0, min(1.0, raw_novelty))
+
     return JSONResponse(
         status_code=status_code,
         content={
             "content": result.get("content", ""),
-            "novelty_score": float(result.get("novelty_score") or 0.0),
+            "novelty_score": novelty_score,
             "predicted_position": predicted,
             "iterations_used": int(result.get("iterations_used") or 0),
             "success": bool(result.get("success", False)),

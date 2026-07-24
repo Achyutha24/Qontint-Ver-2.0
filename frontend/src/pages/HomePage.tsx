@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as THREE from 'three'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
@@ -53,8 +53,8 @@ function HomeHeroScene() {
     const velocities = new Float32Array(numParticles)
     const xSeeds = new Float32Array(numParticles)
     
-    const darkPalette = [new THREE.Color('#d4956a'), new THREE.Color('#f0d080'), new THREE.Color('#c8722a'), new THREE.Color('#d06848')]
-    const lightPalette = [new THREE.Color('#d4813a'), new THREE.Color('#8b6f47'), new THREE.Color('#5a8a6e')]
+    const darkPalette = [new THREE.Color('#E8894A'), new THREE.Color('#E3B06B'), new THREE.Color('#D69A6A'), new THREE.Color('#D69A6A')]
+    const lightPalette = [new THREE.Color('#E8894A'), new THREE.Color('#C97A45'), new THREE.Color('#E3B06B')]
     const palette = isDark ? darkPalette : lightPalette
 
     for (let i = 0; i < numParticles; i++) {
@@ -125,7 +125,7 @@ function HomeHeroScene() {
     // 2. Crystalline Lattice (Icosahedron)
     const latticeGeo = new THREE.IcosahedronGeometry(2.5, 1)
     const latticeMat = new THREE.MeshBasicMaterial({ 
-      color: 0xd4956a, 
+      color: 0xE8894A, 
       wireframe: true, 
       transparent: true, 
       opacity: 0.4,
@@ -139,7 +139,7 @@ function HomeHeroScene() {
     const pulseMat = new THREE.ShaderMaterial({
       uniforms: {
         uTime: { value: 0 },
-        uColor: { value: new THREE.Color(0xd4956a) }
+        uColor: { value: new THREE.Color(0xE8894A) }
       },
       vertexShader: `
         varying vec3 vNormal;
@@ -174,7 +174,7 @@ function HomeHeroScene() {
         new THREE.Vector3(0, 12, 0)
       ])
       const beamMat = new THREE.LineBasicMaterial({ 
-        color: 0xd4956a, 
+        color: 0xE8894A, 
         transparent: true, 
         opacity: 0.1,
         blending: THREE.AdditiveBlending
@@ -193,7 +193,7 @@ function HomeHeroScene() {
     const satellites: THREE.Mesh[] = []
     for (let i = 0; i < satCount; i++) {
       const sGeo = new THREE.BoxGeometry(0.15, 0.15, 0.15)
-      const sMat = new THREE.MeshBasicMaterial({ color: 0xf0d080 })
+      const sMat = new THREE.MeshBasicMaterial({ color: 0xE3B06B })
       const s = new THREE.Mesh(sGeo, sMat)
       const dist = 4 + Math.random() * 2
       s.position.set(dist, 0, 0)
@@ -272,7 +272,7 @@ function TypewriterEffect() {
     const interval = setInterval(() => setIndex(p => (p + 1) % words.length), 2500)
     return () => clearInterval(interval)
   }, [])
-  const gradient = 'linear-gradient(90deg, #d4956a, #f0d080)'
+  const gradient = 'linear-gradient(90deg, #E8894A, #E3B06B)'
   return (
     <span className="inline-block min-w-[200px] sm:min-w-[400px]">
       <motion.span key={index} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }}
@@ -346,7 +346,7 @@ export default function HomePage() {
                     <button
                       key={d.key}
                       onClick={() => domainContext.setDomain(d.key)}
-                      className="card p-6 flex flex-col items-start gap-3 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(212,149,106,0.15)] hover:border-[var(--aurora)] group text-left"
+                      className="card p-6 flex flex-col items-start gap-3 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(232,137,74,0.15)] hover:border-[var(--aurora)] group text-left"
                     >
                       <div className="w-10 h-10 rounded-xl bg-[var(--bg-depth)] border border-[var(--border-subtle)] flex items-center justify-center group-hover:bg-[var(--aurora)]/10 group-hover:border-[var(--aurora)]/30 transition-colors">
                         <Icon className="w-5 h-5 text-[var(--text-primary)] group-hover:text-[var(--aurora)] transition-colors" />
@@ -380,7 +380,7 @@ export default function HomePage() {
               </div>
             </div>
           ) : (
-            <div className="card p-5 max-w-md mx-auto flex items-center justify-between border-[var(--aurora)]/30 bg-gradient-to-r from-[var(--bg-depth)] to-transparent shadow-[0_0_20px_rgba(212,149,106,0.05)]">
+            <div className="card p-5 max-w-md mx-auto flex items-center justify-between border-[var(--aurora)]/30 bg-gradient-to-r from-[var(--bg-depth)] to-transparent shadow-[0_0_20px_rgba(232,137,74,0.05)]">
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-full bg-[var(--aurora)]/10 border border-[var(--aurora)] flex items-center justify-center">
                   <CheckCircle className="w-5 h-5 text-[var(--aurora)]" />
@@ -423,7 +423,7 @@ export default function HomePage() {
             <MotionWrapper key={i} delay={i * 0.07}>
               <div className="card p-8 group h-full">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-6 transition-all duration-300 group-hover:scale-110"
-                  style={{ background: 'rgba(212,149,106,0.1)', border: '1px solid rgba(212,149,106,0.2)' }}>
+                  style={{ background: 'rgba(232,137,74,0.1)', border: '1px solid rgba(232,137,74,0.2)' }}>
                   <f.icon className="w-5 h-5 text-[var(--aurora)]" />
                 </div>
                 <h3 className="text-xl font-bold mb-3">{f.title}</h3>
@@ -438,7 +438,7 @@ export default function HomePage() {
       <section className="py-24 container mx-auto px-6">
         <MotionWrapper>
           <div className="card p-12 text-center max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-around gap-8"
-            style={{ background: 'linear-gradient(135deg, rgba(212,149,106,0.05) 0%, rgba(18,14,10,0.95) 100%)' }}>
+            style={{ background: 'linear-gradient(135deg, rgba(232,137,74,0.05) 0%, rgba(11,11,13,0.95) 100%)' }}>
             {[
               { n: '116+', l: 'Keywords Tracked' },
               { n: '4', l: 'B2B Verticals' },

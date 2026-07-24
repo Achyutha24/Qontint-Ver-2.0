@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Activity, Database, Layers, Cpu, TrendingUp, AlertTriangle, CheckCircle, Terminal } from 'lucide-react'
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts'
@@ -58,7 +58,7 @@ export default function DashboardPage() {
     const group = new THREE.Group()
 
     // Grid Floor
-    const grid = new THREE.GridHelper(20, 20, isDark ? 0xd4956a : 0xd4813a, isDark ? 0x1a1410 : 0xede8dc)
+    const grid = new THREE.GridHelper(20, 20, isDark ? 0xE8894A : 0xE8894A, isDark ? 0x050505 : 0x1D2026)
     grid.position.y = -5
     const gridMat = grid.material as THREE.Material
     gridMat.transparent = true
@@ -70,7 +70,7 @@ export default function DashboardPage() {
     for (let i = 0; i < 3; i++) {
       const geo = new THREE.TorusGeometry(3 + i * 2, 0.02, 16, 100)
       const mat = new THREE.MeshBasicMaterial({ 
-        color: isDark ? 0xf0d080 : 0xe8a020, 
+        color: isDark ? 0xE3B06B : 0xE3B06B, 
         transparent: true, 
         opacity: isDark ? 0.3 : 0.4 
       })
@@ -87,8 +87,8 @@ export default function DashboardPage() {
     for (let i = 0; i < barCount; i++) {
       const geo = new THREE.CylinderGeometry(0.3, 0.3, 1, 32)
       const mat = new THREE.MeshStandardMaterial({
-        color: isDark ? 0xd4956a : 0xd4813a,
-        emissive: isDark ? 0xd4956a : 0xd4813a,
+        color: isDark ? 0xE8894A : 0xE8894A,
+        emissive: isDark ? 0xE8894A : 0xE8894A,
         emissiveIntensity: isDark ? 0.5 : 0.1,
         transparent: true,
         opacity: isDark ? 0.8 : 0.6
@@ -113,7 +113,7 @@ export default function DashboardPage() {
     }
     partGeo.setAttribute('position', new THREE.BufferAttribute(partPos, 3))
     const partMat = new THREE.PointsMaterial({ 
-      color: isDark ? 0xf0d080 : 0xd4813a, 
+      color: isDark ? 0xE3B06B : 0xE8894A, 
       size: 0.05, 
       transparent: true, 
       opacity: isDark ? 0.4 : 0.3 
@@ -125,7 +125,7 @@ export default function DashboardPage() {
     camera.position.set(0, 5, 15)
     camera.lookAt(0, 0, 0)
 
-    const light = new THREE.PointLight(isDark ? 0xd4956a : 0xffffff, isDark ? 2 : 1)
+    const light = new THREE.PointLight(isDark ? 0xE8894A : 0xffffff, isDark ? 2 : 1)
     light.position.set(10, 20, 10)
     scene.add(light)
     scene.add(new THREE.AmbientLight(0xffffff, isDark ? 0.1 : 0.6))

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+﻿import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Video, Target, Zap, BarChart2, AlertTriangle } from 'lucide-react'
 import * as THREE from 'three'
@@ -105,9 +105,9 @@ export default function YouTubePage() {
       const height = 1.4
       const geo = new THREE.CylinderGeometry(radius * 0.85, radius, height, 4, 1, true)
       const mat = new THREE.MeshStandardMaterial({
-        color: isDark ? 0xd4956a : 0xd4813a,
+        color: isDark ? 0xE8894A : 0xE8894A,
         wireframe: true,
-        emissive: isDark ? 0xd4956a : 0xd4813a,
+        emissive: isDark ? 0xE8894A : 0xE8894A,
         emissiveIntensity: isDark ? 0.7 : 0.3
       })
       const segment = new THREE.Mesh(geo, mat)
@@ -123,7 +123,7 @@ export default function YouTubePage() {
     for (let i = 0; i < ringCount; i++) {
       const geo = new THREE.TorusGeometry(1.2, 0.06, 16, 100)
       const mat = new THREE.MeshBasicMaterial({
-        color: isDark ? 0xf0d080 : 0xe8a020,
+        color: isDark ? 0xE3B06B : 0xE3B06B,
         transparent: true,
         opacity: 0.6,
         blending: isDark ? THREE.AdditiveBlending : THREE.NormalBlending
@@ -143,11 +143,11 @@ export default function YouTubePage() {
     const cardGeo = new THREE.PlaneGeometry(2, 2.6)
     for (let i = 0; i < cardCount; i++) {
       const mat = new THREE.MeshStandardMaterial({
-        color: isDark ? 0xe8c080 : 0x5a8a6e,
+        color: isDark ? 0xE3B06B : 0xE3B06B,
         transparent: true,
         opacity: 0.65,
         side: THREE.DoubleSide,
-        emissive: isDark ? 0xe8c080 : 0x5a8a6e,
+        emissive: isDark ? 0xE3B06B : 0xE3B06B,
         emissiveIntensity: isDark ? 0.3 : 0.15
       })
       const card = new THREE.Mesh(cardGeo, mat)
@@ -162,7 +162,7 @@ export default function YouTubePage() {
     group.scale.setScalar(0.85)
     scene.add(group)
     
-    const light = new THREE.PointLight(isDark ? 0xd4956a : 0xffffff, isDark ? 3 : 1.5, 80)
+    const light = new THREE.PointLight(isDark ? 0xE8894A : 0xffffff, isDark ? 3 : 1.5, 80)
     light.position.set(0, 15, 8)
     scene.add(light)
     scene.add(new THREE.AmbientLight(0xffffff, isDark ? 0.15 : 0.5))

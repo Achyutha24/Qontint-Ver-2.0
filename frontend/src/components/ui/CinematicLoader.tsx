@@ -1,4 +1,4 @@
-/**
+﻿/**
  * CinematicLoader — Premium AI processing feedback overlay.
  * Shows animated rings, semantic log streaming, and neural pulse.
  * Completely isolated from business logic — reads only `isLoading` and `logs` props.
@@ -84,9 +84,9 @@ export default function CinematicLoader({
     const start = performance.now()
 
     const rings = [
-      { r: 70, speed: 0.8, width: 1.5, dashLen: 30, color: 'rgba(212,149,106,' },
-      { r: 55, speed: -1.2, width: 1, dashLen: 20, color: 'rgba(240,208,128,' },
-      { r: 40, speed: 1.8, width: 0.8, dashLen: 15, color: 'rgba(208,104,72,' },
+      { r: 70, speed: 0.8, width: 1.5, dashLen: 30, color: 'rgba(232,137,74,' },
+      { r: 55, speed: -1.2, width: 1, dashLen: 20, color: 'rgba(227,176,107,' },
+      { r: 40, speed: 1.8, width: 0.8, dashLen: 15, color: 'rgba(214,154,106,' },
     ]
 
     const tick = (now: number) => {
@@ -113,8 +113,8 @@ export default function CinematicLoader({
       // Core pulse
       const pulse = 0.5 + 0.5 * Math.sin(t * 3)
       const grad = ctx.createRadialGradient(100, 100, 0, 100, 100, 25)
-      grad.addColorStop(0, `rgba(212,149,106,${0.6 * pulse})`)
-      grad.addColorStop(0.6, `rgba(212,149,106,${0.2 * pulse})`)
+      grad.addColorStop(0, `rgba(232,137,74,${0.6 * pulse})`)
+      grad.addColorStop(0.6, `rgba(232,137,74,${0.2 * pulse})`)
       grad.addColorStop(1, 'transparent')
       ctx.fillStyle = grad
       ctx.beginPath()
@@ -126,7 +126,7 @@ export default function CinematicLoader({
       ctx.translate(100, 100)
       ctx.rotate(t * 1.5)
       const scanGrad = ctx.createLinearGradient(0, 0, 70, 0)
-      scanGrad.addColorStop(0, 'rgba(212,149,106,0.8)')
+      scanGrad.addColorStop(0, 'rgba(232,137,74,0.8)')
       scanGrad.addColorStop(1, 'transparent')
       ctx.strokeStyle = scanGrad
       ctx.lineWidth = 1.5
@@ -152,7 +152,7 @@ export default function CinematicLoader({
           className="w-full"
         >
           <div className="card p-6 space-y-5 border border-[var(--border-subtle)]"
-            style={{ background: 'linear-gradient(135deg, rgba(18,14,10,0.95), rgba(26,20,15,0.95))' }}>
+            style={{ background: 'linear-gradient(135deg, rgba(11,11,13,0.95), rgba(17,19,22,0.95))' }}>
             
             <div className="flex items-center gap-6">
               {/* Animated rings canvas */}

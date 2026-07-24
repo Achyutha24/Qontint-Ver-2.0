@@ -328,40 +328,58 @@ async def generate_with_validation(
         def _score_content(c: str) -> dict:
             analysis = build_content_analysis(c, keyword, vertical, serp_docs)
             scores = run_full_scoring(analysis)
-            
-            # Helper to extract float score from dict or float
-            def get_score(s):
+
+            # ROOT CAUSE FIX: run_full_scoring uses make_score() which returns
+            # {"score": <0-100 float>, "confidence": ..., "reason": ...}.
+            # We must extract "score" and normalise it to the 0–1 scale that
+            # the frontend and NoveltyBar expect.  Mixing 0-100 and 0-1 was
+            # what caused impossible values like 7880 (e.g. 78.80 * 100).
+            def _to_01(s: Any) -> float:
+                """Extract a score value and return it normalised to 0–1."""
                 if isinstance(s, dict):
-                    return float(s.get("score", 0.0))
-                return float(s or 0.0)
-                
+                    val = float(s.get("score", 0.0))
+                else:
+                    val = float(s or 0.0)
+                # run_full_scoring produces 0-100; anything >1 needs division
+                return max(0.0, min(1.0, val / 100.0 if val > 1.0 else val))
+
+            novelty_01 = _to_01(scores.novelty_score)
+
+            # threshold from run_full_scoring is 70.0 (0-100) → normalise
+            raw_threshold = float(scores.threshold or 70.0)
+            threshold_01 = raw_threshold / 100.0 if raw_threshold > 1.0 else raw_threshold
+
+            # confidence from run_full_scoring is 0-100 → normalise
+            raw_conf = float(scores.confidence or 0.0)
+            confidence_01 = raw_conf / 100.0 if raw_conf > 1.0 else raw_conf
+
             return {
                 "novelty": {
-                    "novelty_score": get_score(scores.novelty_score),
-                    "similarity_score": scores.similarity_score,
-                    "entity_novelty": scores.entity_novelty,
-                    "relationship_novelty": scores.relationship_novelty,
-                    "semantic_diversity": scores.semantic_diversity,
-                    "passed": scores.passed,
-                    "threshold": scores.threshold,
-                    "verdict": scores.verdict,
-                    "reasoning": scores.reasoning,
-                    "processing_time_ms": 0,
+                    "novelty_score":        novelty_01,
+                    "similarity_score":     max(0.0, min(1.0, float(scores.similarity_score or 0.0))),
+                    "entity_novelty":       max(0.0, min(1.0, float(scores.entity_novelty or 0.0))),
+                    "relationship_novelty": max(0.0, min(1.0, float(scores.relationship_novelty or 0.0))),
+                    "semantic_diversity":   max(0.0, min(1.0, float(scores.semantic_diversity or 0.0))),
+                    "passed":               bool(scores.passed),
+                    "threshold":            round(threshold_01, 2),
+                    "verdict":              str(scores.verdict or ""),
+                    "reasoning":            list(scores.reasoning or []),
+                    "processing_time_ms":   0,
                 },
                 "authority": {
-                    "matched_entities": scores.matched_entities,
-                    "missing_entities": scores.missing_entities,
-                    "authority_score": get_score(scores.authority_score),
+                    "matched_entities": list(scores.matched_entities or []),
+                    "missing_entities": list(scores.missing_entities or []),
+                    "authority_score":   _to_01(scores.authority_score),
                 },
                 "ranking": {
-                    "predicted_rank": scores.predicted_rank,
-                    "confidence": scores.confidence,
-                    "ranking_factors": scores.ranking_factors,
-                    "optimization_gaps": scores.optimization_gaps,
-                    "model_version": "deterministic_serp_v2",
+                    "predicted_rank":    int(scores.predicted_rank or 50),
+                    "confidence":        round(confidence_01, 3),
+                    "ranking_factors":   dict(scores.ranking_factors or {}),
+                    "optimization_gaps": list(scores.optimization_gaps or []),
+                    "model_version":     "deterministic_serp_v2",
                     "processing_time_ms": 0,
                 },
-                "serp_grounded": scores.serp_grounded,
+                "serp_grounded": bool(scores.serp_grounded),
             }
 
         unified = await loop.run_in_executor(None, functools.partial(_score_content, content))

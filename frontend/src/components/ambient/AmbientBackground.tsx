@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AmbientBackground — Cinematic layered ambient canvas.
  * Renders: slow gradient glows, faint neural grid, semantic flow particles.
  * GPU-optimized via RAF + transform3d. Opacity low for readability.
@@ -16,11 +16,11 @@ interface AmbientBackgroundProps {
 }
 
 const VARIANT_CONFIGS = {
-  default:   { gridColor: 'rgba(212,149,106,0.025)', particleColor: '#d4956a', glowColor1: '#d4956a', glowColor2: '#f0d080' },
-  scanner:   { gridColor: 'rgba(212,149,106,0.035)', particleColor: '#d06848', glowColor1: '#d06848', glowColor2: '#d4956a' },
-  graph:     { gridColor: 'rgba(240,208,128,0.02)',  particleColor: '#f0d080', glowColor1: '#f0d080', glowColor2: '#d4956a' },
-  signal:    { gridColor: 'rgba(208,104,72,0.025)',  particleColor: '#d06848', glowColor1: '#d06848', glowColor2: '#a0785a' },
-  dashboard: { gridColor: 'rgba(160,120,90,0.025)',  particleColor: '#a0785a', glowColor1: '#a0785a', glowColor2: '#d4956a' },
+  default:   { gridColor: 'rgba(232,137,74,0.025)', particleColor: '#E8894A', glowColor1: '#E8894A', glowColor2: '#E3B06B' },
+  scanner:   { gridColor: 'rgba(232,137,74,0.035)', particleColor: '#D69A6A', glowColor1: '#D69A6A', glowColor2: '#E8894A' },
+  graph:     { gridColor: 'rgba(227,176,107,0.02)',  particleColor: '#E3B06B', glowColor1: '#E3B06B', glowColor2: '#E8894A' },
+  signal:    { gridColor: 'rgba(214,154,106,0.025)',  particleColor: '#D69A6A', glowColor1: '#D69A6A', glowColor2: '#C97A45' },
+  dashboard: { gridColor: 'rgba(201,122,69,0.025)',  particleColor: '#C97A45', glowColor1: '#C97A45', glowColor2: '#E8894A' },
 }
 
 export default function AmbientBackground({

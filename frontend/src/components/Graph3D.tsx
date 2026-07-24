@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react'
+﻿import { useRef, useMemo } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Float, Sparkles, Text } from '@react-three/drei'
 import * as THREE from 'three'
@@ -36,25 +36,25 @@ function GraphScene({ nodes, edges, onNodeHover, onNodeClick, selectedId }: Prop
   const TYPE_COLORS: Record<string, string> = useMemo(() => {
     if (isDark) {
       return {
-        PRODUCT:     '#d4956a', // aurora amber
-        TECHNOLOGY:  '#f0d080', // gold
-        ORG:         '#c8722a', // solar orange
-        PERSON:      '#d06848', // coral
-        CONCEPT:     '#e8c080', // stellar gold
-        PROCESS:     '#a0785a', // plasma
-        STANDARD:    '#d4956a',
-        DEFAULT:     '#d4956a',
+        PRODUCT:     '#E8894A', // aurora amber
+        TECHNOLOGY:  '#E3B06B', // gold
+        ORG:         '#D69A6A', // solar orange
+        PERSON:      '#D69A6A', // coral
+        CONCEPT:     '#E3B06B', // stellar gold
+        PROCESS:     '#C97A45', // plasma
+        STANDARD:    '#E8894A',
+        DEFAULT:     '#E8894A',
       }
     } else {
       return {
-        PRODUCT:     '#d4813a', // amber
-        TECHNOLOGY:  '#8b6f47', // plasma/brown
-        ORG:         '#e8a020', // solar yellow
-        PERSON:      '#c45e3e', // coral
-        CONCEPT:     '#5a8a6e', // stellar/sage
-        PROCESS:     '#d4813a',
-        STANDARD:    '#8b6f47',
-        DEFAULT:     '#d4813a',
+        PRODUCT:     '#E8894A', // amber
+        TECHNOLOGY:  '#C97A45', // plasma/brown
+        ORG:         '#E3B06B', // solar yellow
+        PERSON:      '#C97A45', // coral
+        CONCEPT:     '#E3B06B', // warm amber-gold (light mode)
+        PROCESS:     '#E8894A',
+        STANDARD:    '#C97A45',
+        DEFAULT:     '#E8894A',
       }
     }
   }, [isDark])
@@ -151,10 +151,10 @@ function GraphScene({ nodes, edges, onNodeHover, onNodeClick, selectedId }: Prop
   return (
     <>
       <ambientLight intensity={isDark ? 0.8 : 1.2} />
-      <pointLight position={[50, 50, 50]} intensity={isDark ? 5 : 3} color={isDark ? '#f0d080' : '#ffffff'} />
-      <pointLight position={[-50, -50, -50]} intensity={isDark ? 3 : 2} color={isDark ? '#d4956a' : '#ffffff'} />
+      <pointLight position={[50, 50, 50]} intensity={isDark ? 5 : 3} color={isDark ? '#E3B06B' : '#ffffff'} />
+      <pointLight position={[-50, -50, -50]} intensity={isDark ? 3 : 2} color={isDark ? '#E8894A' : '#ffffff'} />
 
-      <Sparkles count={isDark ? 100 : 50} scale={60} size={isDark ? 3 : 1} speed={0.3} color={isDark ? '#f0d080' : '#d4813a'} />
+      <Sparkles count={isDark ? 100 : 50} scale={60} size={isDark ? 3 : 1} speed={0.3} color={isDark ? '#E3B06B' : '#E8894A'} />
 
       <group ref={groupRef}>
         {nodes.map(node => {

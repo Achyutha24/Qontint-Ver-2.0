@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+﻿import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Network, RotateCcw, Info, X, Globe } from 'lucide-react'
 import * as THREE from 'three'
@@ -20,10 +20,10 @@ function DecorativeGalaxy() {
     const pos = new Float32Array(numParticles * 3)
     const col = new Float32Array(numParticles * 3)
     
-    const darkAur = new THREE.Color('#d4956a')
-    const darkPla = new THREE.Color('#a0785a')
-    const lightAur = new THREE.Color('#d4813a')
-    const lightSte = new THREE.Color('#5a8a6e')
+    const darkAur = new THREE.Color('#E8894A')
+    const darkPla = new THREE.Color('#C97A45')
+    const lightAur = new THREE.Color('#E8894A')
+    const lightSte = new THREE.Color('#E3B06B') // warm amber-gold (was sage green)
     
     for (let i = 0; i < numParticles; i++) {
       const angle = i * 2.39996
@@ -65,8 +65,8 @@ function DecorativeGalaxy() {
       const spriteGeo = new THREE.PlaneGeometry(10, 10)
       const spriteMat = new THREE.MeshBasicMaterial({
         color: isDark 
-          ? (i % 2 === 0 ? 0xd4956a : 0xa0785a)
-          : (i % 2 === 0 ? 0xd4813a : 0xede8dc),
+          ? (i % 2 === 0 ? 0xE8894A : 0xC97A45)
+          : (i % 2 === 0 ? 0xE8894A : 0x1D2026),
         transparent: true,
         opacity: isDark ? 0.05 : 0.03,
         blending: isDark ? THREE.AdditiveBlending : THREE.NormalBlending,

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+﻿import { useState, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { CheckCircle, Zap, Shield, Star, ArrowRight, Globe } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -195,10 +195,10 @@ export default function PricingPage() {
     })
 
     const goldMat = new THREE.MeshStandardMaterial({
-      color: isDark ? 0xf0d080 : 0xe8a020, // Gold / Solar
+      color: isDark ? 0xE3B06B : 0xE3B06B, // Gold / Solar
       metalness: 1.0,
       roughness: 0.1,
-      emissive: isDark ? 0xf0d080 : 0xe8a020,
+      emissive: isDark ? 0xE3B06B : 0xE3B06B,
       emissiveIntensity: isDark ? 0.3 : 0.1
     })
 
@@ -237,7 +237,7 @@ export default function PricingPage() {
     }
     partGeo.setAttribute('position', new THREE.BufferAttribute(partPos, 3))
     const partMat = new THREE.PointsMaterial({ 
-      color: isDark ? 0xf0d080 : 0xd4813a, 
+      color: isDark ? 0xE3B06B : 0xE8894A, 
       size: 0.08, 
       transparent: true, 
       opacity: isDark ? 0.6 : 0.4 
@@ -247,11 +247,11 @@ export default function PricingPage() {
 
     scene.add(group)
     
-    const p1 = new THREE.PointLight(isDark ? 0xd4956a : 0xffffff, isDark ? 5 : 2, 50)
+    const p1 = new THREE.PointLight(isDark ? 0xE8894A : 0xffffff, isDark ? 5 : 2, 50)
     p1.position.set(-10, 10, 10)
     scene.add(p1)
     
-    const p2 = new THREE.PointLight(isDark ? 0xf0d080 : 0xd4813a, isDark ? 5 : 2, 50)
+    const p2 = new THREE.PointLight(isDark ? 0xE3B06B : 0xE8894A, isDark ? 5 : 2, 50)
     p2.position.set(10, -10, 10)
     scene.add(p2)
     
