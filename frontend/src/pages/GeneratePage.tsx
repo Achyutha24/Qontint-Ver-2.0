@@ -173,7 +173,7 @@ export default function GeneratePage() {
     }
     starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3))
     const starMat = new THREE.PointsMaterial({ 
-      color: isDark ? 0xffffff : 0xE8894A, 
+      color: isDark ? 0xffffff : 0xF97316, 
       size: 0.1, 
       transparent: true, 
       opacity: isDark ? 0.5 : 0.3 
@@ -188,8 +188,8 @@ export default function GeneratePage() {
     const coreMat = new THREE.ShaderMaterial({
       uniforms: {
         uTime: { value: 0 },
-        uColor1: { value: new THREE.Color(isDark ? '#E8894A' : '#E8894A') },
-        uColor2: { value: new THREE.Color(isDark ? '#E3B06B' : '#C97A45') }
+        uColor1: { value: new THREE.Color(isDark ? '#F97316' : '#F97316') },
+        uColor2: { value: new THREE.Color(isDark ? '#F59E0B' : '#EA580C') }
       },
       vertexShader: `
         uniform float uTime;
@@ -229,7 +229,7 @@ export default function GeneratePage() {
       const radius = 4 + i * 1.5
       const ringGeo = new THREE.TorusGeometry(radius, 0.02, 16, 100)
       const ringMat = new THREE.MeshBasicMaterial({ 
-        color: isDark ? 0xE8894A : 0xE8894A, 
+        color: isDark ? 0xF97316 : 0xF97316, 
         transparent: true, 
         opacity: isDark ? 0.3 : 0.4 
       })
@@ -242,7 +242,7 @@ export default function GeneratePage() {
       // Electrons
       for (let j = 0; j < 20; j++) {
         const elGeo = new THREE.SphereGeometry(0.08, 8, 8)
-        const elMat = new THREE.MeshBasicMaterial({ color: isDark ? 0xffffff : 0xE3B06B })
+        const elMat = new THREE.MeshBasicMaterial({ color: isDark ? 0xffffff : 0xF59E0B })
         const el = new THREE.Mesh(elGeo, elMat)
         const angle = (j / 20) * Math.PI * 2
         el.position.set(Math.cos(angle) * radius, Math.sin(angle) * radius, 0)
@@ -258,7 +258,7 @@ export default function GeneratePage() {
     const lightningPos = new Float32Array(8 * 2 * 3) 
     lightningGeo.setAttribute('position', new THREE.BufferAttribute(lightningPos, 3))
     const lightningMat = new THREE.LineBasicMaterial({ 
-      color: isDark ? 0xE3B06B : 0xE3B06B, 
+      color: isDark ? 0xF59E0B : 0xF59E0B, 
       transparent: true, 
       opacity: 0 
     })

@@ -184,14 +184,14 @@ export default function KeywordsPage() {
     const stars: THREE.Mesh[] = []
     
     const darkCols = {
-      High:   new THREE.Color('#D69A6A'), // Solar
-      Medium: new THREE.Color('#E8894A'), // Aurora
-      Low:    new THREE.Color('#E3B06B')  // Stellar
+      High:   new THREE.Color('#FFEDD5'), // Solar
+      Medium: new THREE.Color('#F97316'), // Aurora
+      Low:    new THREE.Color('#F59E0B')  // Stellar
     }
     const lightCols = {
-      High:   new THREE.Color('#E3B06B'), // Solar
-      Medium: new THREE.Color('#E8894A'), // Aurora
-      Low:    new THREE.Color('#E3B06B')  // warm amber-gold (was sage)
+      High:   new THREE.Color('#F59E0B'), // Solar
+      Medium: new THREE.Color('#F97316'), // Aurora
+      Low:    new THREE.Color('#F59E0B')  // warm amber-gold (was sage)
     }
     const colors = isDark ? darkCols : lightCols
 
@@ -227,7 +227,7 @@ export default function KeywordsPage() {
 
     // Constellation Lines
     const lineMat = new THREE.LineBasicMaterial({ 
-      color: isDark ? 0xE8894A : 0xE8894A, 
+      color: isDark ? 0xF97316 : 0xF97316, 
       transparent: true, 
       opacity: isDark ? 0.15 : 0.2 
     })

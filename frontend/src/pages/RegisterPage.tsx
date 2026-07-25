@@ -174,7 +174,7 @@ export default function RegisterPage() {
                           key={d.key}
                           onClick={() => handleDomainSelect(d.key)}
                           className={`card p-4 flex flex-col items-start gap-2 transition-all duration-200 hover:-translate-y-0.5 text-left group relative ${
-                            isSelected ? 'border-[var(--aurora)] shadow-[0_0_15px_rgba(232,137,74,0.2)]' : 'hover:border-[var(--aurora)]/50'
+                            isSelected ? 'border-[var(--aurora)] shadow-[0_0_15px_rgba(249,115,22,0.2)]' : 'hover:border-[var(--aurora)]/50'
                           }`}
                         >
                           {isSelected && (

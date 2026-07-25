@@ -1,4 +1,4 @@
-﻿import { useRef, useMemo } from 'react'
+import { useRef, useMemo } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Float, Sparkles, Text } from '@react-three/drei'
 import * as THREE from 'three'
@@ -34,30 +34,17 @@ function GraphScene({ nodes, edges, onNodeHover, onNodeClick, selectedId }: Prop
 
   // ── Palette ──
   const TYPE_COLORS: Record<string, string> = useMemo(() => {
-    if (isDark) {
-      return {
-        PRODUCT:     '#E8894A', // aurora amber
-        TECHNOLOGY:  '#E3B06B', // gold
-        ORG:         '#D69A6A', // solar orange
-        PERSON:      '#D69A6A', // coral
-        CONCEPT:     '#E3B06B', // stellar gold
-        PROCESS:     '#C97A45', // plasma
-        STANDARD:    '#E8894A',
-        DEFAULT:     '#E8894A',
-      }
-    } else {
-      return {
-        PRODUCT:     '#E8894A', // amber
-        TECHNOLOGY:  '#C97A45', // plasma/brown
-        ORG:         '#E3B06B', // solar yellow
-        PERSON:      '#C97A45', // coral
-        CONCEPT:     '#E3B06B', // warm amber-gold (light mode)
-        PROCESS:     '#E8894A',
-        STANDARD:    '#C97A45',
-        DEFAULT:     '#E8894A',
-      }
+    return {
+      PRODUCT:     '#F97316', // Primary (Orange)
+      TECHNOLOGY:  '#7C3AED', // Technology (Purple)
+      ORG:         '#F59E0B', // Warning (Amber)
+      PERSON:      '#2563EB', // Secondary (Blue)
+      CONCEPT:     '#06B6D4', // Information (Cyan)
+      PROCESS:     '#22C55E', // Success (Green)
+      STANDARD:    '#2563EB',
+      DEFAULT:     '#F97316',
     }
-  }, [isDark])
+  }, [])
 
   // Precompute initial positions using a more stable layout (Spiral)
   const positions = useMemo(() => {
@@ -140,8 +127,8 @@ function GraphScene({ nodes, edges, onNodeHover, onNodeClick, selectedId }: Prop
   const edgePositions = useMemo(() => new Float32Array(edges.length * 6), [edges])
   const edgeColors = useMemo(() => {
     const col: number[] = []
-    // Use a deeper, less intense color for edges to prevent white blowout
-    const c = new THREE.Color(isDark ? '#8a5a3a' : '#b4713a')
+    // Use clean light gray #CBD5E1 for edges
+    const c = new THREE.Color('#CBD5E1')
     edges.forEach(() => {
       col.push(c.r, c.g, c.b, c.r, c.g, c.b)
     })
@@ -151,10 +138,10 @@ function GraphScene({ nodes, edges, onNodeHover, onNodeClick, selectedId }: Prop
   return (
     <>
       <ambientLight intensity={isDark ? 0.8 : 1.2} />
-      <pointLight position={[50, 50, 50]} intensity={isDark ? 5 : 3} color={isDark ? '#E3B06B' : '#ffffff'} />
-      <pointLight position={[-50, -50, -50]} intensity={isDark ? 3 : 2} color={isDark ? '#E8894A' : '#ffffff'} />
+      <pointLight position={[50, 50, 50]} intensity={isDark ? 5 : 3} color={isDark ? '#F59E0B' : '#ffffff'} />
+      <pointLight position={[-50, -50, -50]} intensity={isDark ? 3 : 2} color={isDark ? '#F97316' : '#ffffff'} />
 
-      <Sparkles count={isDark ? 100 : 50} scale={60} size={isDark ? 3 : 1} speed={0.3} color={isDark ? '#E3B06B' : '#E8894A'} />
+      <Sparkles count={isDark ? 100 : 50} scale={60} size={isDark ? 3 : 1} speed={0.3} color={isDark ? '#F59E0B' : '#F97316'} />
 
       <group ref={groupRef}>
         {nodes.map(node => {

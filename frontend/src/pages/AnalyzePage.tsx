@@ -44,7 +44,7 @@ export default function AnalyzePage() {
     const canvas = document.createElement('canvas')
     canvas.width = 128; canvas.height = 128
     const ctx = canvas.getContext('2d')!
-    ctx.strokeStyle = isDark ? 'rgba(232,137,74,0.05)' : 'rgba(212,129,58,0.1)'
+    ctx.strokeStyle = isDark ? 'rgba(249,115,22,0.05)' : 'rgba(212,129,58,0.1)'
     ctx.lineWidth = 1
     ctx.beginPath()
     for (let i = 0; i < 6; i++) {
@@ -63,8 +63,8 @@ export default function AnalyzePage() {
     const positions = coreGeo.attributes.position.array
     const group = new THREE.Group()
 
-    const darkColors = ['#E8894A', '#E3B06B', '#D69A6A']
-    const lightColors = ['#E8894A', '#C97A45', '#E3B06B']
+    const darkColors = ['#F97316', '#F59E0B', '#FFEDD5']
+    const lightColors = ['#F97316', '#EA580C', '#F59E0B']
     const colors = isDark ? darkColors : lightColors
     const nodes: THREE.Mesh[] = []
 
@@ -89,7 +89,7 @@ export default function AnalyzePage() {
     const edges = new THREE.LineSegments(
       coreGeo,
       new THREE.LineBasicMaterial({ 
-        color: isDark ? 0xE8894A : 0xE8894A, 
+        color: isDark ? 0xF97316 : 0xF97316, 
         transparent: true, 
         opacity: isDark ? 0.1 : 0.2 
       })
@@ -97,7 +97,7 @@ export default function AnalyzePage() {
     group.add(edges)
     scene.add(group)
 
-    const light = new THREE.PointLight(isDark ? 0xE8894A : 0xffffff, isDark ? 2 : 1)
+    const light = new THREE.PointLight(isDark ? 0xF97316 : 0xffffff, isDark ? 2 : 1)
     light.position.set(10, 10, 10)
     scene.add(light)
     scene.add(new THREE.AmbientLight(0xffffff, isDark ? 0.2 : 0.5))

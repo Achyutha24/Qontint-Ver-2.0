@@ -4,7 +4,7 @@ import * as THREE from 'three'
 
 const PARTICLE_COLORS = [
   new THREE.Color('#FF5E3A'), // Sunset Coral
-  new THREE.Color('#D69A6A'), // Solar Orange (was Blue — replaced for brand consistency)
+  new THREE.Color('#FFEDD5'), // Solar Orange (was Blue — replaced for brand consistency)
   new THREE.Color('#FFB347'), // Amber
 ]
 

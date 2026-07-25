@@ -15,7 +15,7 @@ export default {
         'text-pri':   'var(--text-primary)',
         'text-sec':   'var(--text-secondary)',
         'text-dim':   'var(--text-muted)',
-        // Legacy compat mappings — all remapped to burnt-orange palette
+        // Legacy compat mappings — all remapped to light orange palette
         'cyan':       'var(--plasma)',
         'gold':       'var(--stellar)',
         'purple':     'var(--aurora)',
@@ -27,7 +27,7 @@ export default {
         'intel-blue':     'var(--aurora)',
         'authority-gold': 'var(--stellar)',
         'novelty-purple': 'var(--aurora)',
-        'alert-red':      'var(--solar)',
+        'alert-red':      'var(--danger)',
         'text-primary':   'var(--text-primary)',
         'text-muted':     'var(--text-muted)',
         'graph-accent':   'var(--aurora)',

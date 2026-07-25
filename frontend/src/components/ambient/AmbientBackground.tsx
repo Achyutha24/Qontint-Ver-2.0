@@ -16,11 +16,11 @@ interface AmbientBackgroundProps {
 }
 
 const VARIANT_CONFIGS = {
-  default:   { gridColor: 'rgba(232,137,74,0.025)', particleColor: '#E8894A', glowColor1: '#E8894A', glowColor2: '#E3B06B' },
-  scanner:   { gridColor: 'rgba(232,137,74,0.035)', particleColor: '#D69A6A', glowColor1: '#D69A6A', glowColor2: '#E8894A' },
-  graph:     { gridColor: 'rgba(227,176,107,0.02)',  particleColor: '#E3B06B', glowColor1: '#E3B06B', glowColor2: '#E8894A' },
-  signal:    { gridColor: 'rgba(214,154,106,0.025)',  particleColor: '#D69A6A', glowColor1: '#D69A6A', glowColor2: '#C97A45' },
-  dashboard: { gridColor: 'rgba(201,122,69,0.025)',  particleColor: '#C97A45', glowColor1: '#C97A45', glowColor2: '#E8894A' },
+  default:   { gridColor: 'rgba(249,115,22,0.025)', particleColor: '#F97316', glowColor1: '#F97316', glowColor2: '#F59E0B' },
+  scanner:   { gridColor: 'rgba(249,115,22,0.035)', particleColor: '#FFEDD5', glowColor1: '#FFEDD5', glowColor2: '#F97316' },
+  graph:     { gridColor: 'rgba(245,158,11,0.02)',  particleColor: '#F59E0B', glowColor1: '#F59E0B', glowColor2: '#F97316' },
+  signal:    { gridColor: 'rgba(249,115,22,0.025)',  particleColor: '#FFEDD5', glowColor1: '#FFEDD5', glowColor2: '#EA580C' },
+  dashboard: { gridColor: 'rgba(234,88,12,0.025)',  particleColor: '#EA580C', glowColor1: '#EA580C', glowColor2: '#F97316' },
 }
 
 export default function AmbientBackground({

@@ -30,10 +30,10 @@ export default function GlassCard({
   const prefersReduced = useReducedMotion()
 
   const baseStyle: CSSProperties = {
-    background: 'linear-gradient(135deg, rgba(17,19,22,0.85) 0%, rgba(11,11,13,0.9) 100%)',
+    background: 'linear-gradient(135deg, rgba(255,255,255,0.85) 0%, rgba(241,245,249,0.9) 100%)',
     backdropFilter: 'blur(16px)',
     WebkitBackdropFilter: 'blur(16px)',
-    border: '1px solid rgba(232,137,74,0.1)',
+    border: '1px solid rgba(249,115,22,0.1)',
     borderRadius: '16px',
     position: 'relative',
     overflow: 'hidden',
@@ -63,12 +63,12 @@ export default function GlassCard({
       variants={{
         rest: {
           y: 0,
-          borderColor: 'rgba(232,137,74,0.1)',
+          borderColor: 'rgba(249,115,22,0.1)',
           boxShadow: '0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03)',
         },
         hover: {
           y: -2,
-          borderColor: 'rgba(232,137,74,0.25)',
+          borderColor: 'rgba(249,115,22,0.25)',
           boxShadow: `0 8px 32px ${glowColor}, inset 0 1px 0 rgba(255,255,255,0.05)`,
           transition: { duration: 0.2, ease: 'easeOut' },
         },
@@ -77,7 +77,7 @@ export default function GlassCard({
       {/* Inner top shimmer */}
       <div
         className="absolute inset-x-0 top-0 h-px pointer-events-none"
-        style={{ background: 'linear-gradient(90deg, transparent, rgba(232,137,74,0.2), transparent)' }}
+        style={{ background: 'linear-gradient(90deg, transparent, rgba(249,115,22,0.2), transparent)' }}
       />
       {children}
     </motion.div>

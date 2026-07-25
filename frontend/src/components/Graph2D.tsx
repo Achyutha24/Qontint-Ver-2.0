@@ -38,14 +38,14 @@ interface Props {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  TECHNOLOGY: '#38BDF8',
-  ORG:        '#F4A261',
-  PRODUCT:    '#A78BFA',
-  PERSON:     '#22C55E',
-  CONCEPT:    '#F59E0B',
-  PROCESS:    '#14B8A6',
-  STANDARD:   '#94A3B8',
-  DEFAULT:    '#64748B',
+  PRODUCT:    '#F97316', // Primary (Orange)
+  TECHNOLOGY: '#7C3AED', // Technology (Purple)
+  ORG:        '#F59E0B', // Warning (Amber)
+  PERSON:     '#2563EB', // Secondary (Blue)
+  CONCEPT:    '#06B6D4', // Information (Cyan)
+  PROCESS:    '#22C55E', // Success (Green)
+  STANDARD:   '#2563EB',
+  DEFAULT:    '#F97316',
 }
 
 function getColor(type: string | undefined): string {
@@ -124,7 +124,7 @@ export default function Graph2D({ nodes, edges, onNodeHover, onNodeClick, select
       selector: '.selected',
       style: {
         'border-width': 4,
-        'border-color': '#F4A261',
+        'border-color': '#F97316',
         'width': 'mapData(authority, 0, 1, 25, 70)',
         'height': 'mapData(authority, 0, 1, 25, 70)',
       }
@@ -133,7 +133,7 @@ export default function Graph2D({ nodes, edges, onNodeHover, onNodeClick, select
       selector: '.neighbor',
       style: {
         'border-width': 3,
-        'border-color': '#38BDF8',
+        'border-color': '#2563EB',
       }
     },
     {

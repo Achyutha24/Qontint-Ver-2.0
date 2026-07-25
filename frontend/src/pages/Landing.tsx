@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Landing — Public landing page.
  * Wraps the existing HomePage but updates CTA navigation to /app/analyze.
  * The footer is rendered by LandingLayout — do NOT add another footer here.
@@ -63,8 +63,8 @@ function HomeHeroScene() {
     const velocities = new Float32Array(numParticles)
     const xSeeds = new Float32Array(numParticles)
 
-    const darkPalette = [new THREE.Color('#E8894A'), new THREE.Color('#E3B06B'), new THREE.Color('#D69A6A'), new THREE.Color('#D69A6A')]
-    const lightPalette = [new THREE.Color('#E8894A'), new THREE.Color('#C97A45'), new THREE.Color('#E3B06B')]
+    const darkPalette = [new THREE.Color('#F97316'), new THREE.Color('#F59E0B'), new THREE.Color('#FFEDD5'), new THREE.Color('#FFEDD5')]
+    const lightPalette = [new THREE.Color('#CBD5E1'), new THREE.Color('#F97316'), new THREE.Color('#2563EB'), new THREE.Color('#7C3AED')]
     const palette = isDark ? darkPalette : lightPalette
 
     for (let i = 0; i < numParticles; i++) {
@@ -116,7 +116,7 @@ function HomeHeroScene() {
           float dist = distance(gl_PointCoord, vec2(0.5));
           if (dist > 0.5) discard;
           float strength = 1.0 - (dist * 2.0);
-          gl_FragColor = vec4(vColor, strength * (vTheme > 0.5 ? 0.9 : 0.6));
+          gl_FragColor = vec4(vColor, strength * (vTheme > 0.5 ? 0.9 : 0.35));
         }
       `,
       transparent: true, blending: isDark ? THREE.AdditiveBlending : THREE.NormalBlending, depthWrite: false
@@ -128,18 +128,18 @@ function HomeHeroScene() {
     // Intelligence core
     const coreGroup = new THREE.Group()
     const innerGeo = new THREE.SphereGeometry(1.2, 32, 32)
-    const innerMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
+    const innerMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 })
     const innerCore = new THREE.Mesh(innerGeo, innerMat)
     coreGroup.add(innerCore)
     const latticeGeo = new THREE.IcosahedronGeometry(2.5, 1)
-    const latticeMat = new THREE.MeshBasicMaterial({ color: 0xE8894A, wireframe: true, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending })
+    const latticeMat = new THREE.MeshBasicMaterial({ color: 0xCBD5E1, wireframe: true, transparent: true, opacity: 0.5, blending: THREE.NormalBlending })
     const lattice = new THREE.Mesh(latticeGeo, latticeMat)
     coreGroup.add(lattice)
     const pulseGeo = new THREE.SphereGeometry(2.8, 32, 32)
     const pulseMat = new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uColor: { value: new THREE.Color(0xE8894A) } },
+      uniforms: { uTime: { value: 0 }, uColor: { value: new THREE.Color('#F97316') } },
       vertexShader: `varying vec3 vNormal; void main() { vNormal = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: `uniform float uTime; uniform vec3 uColor; varying vec3 vNormal; void main() { float intensity = pow(0.7 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 3.0); float p = 0.5 + 0.5 * sin(uTime * 2.0); gl_FragColor = vec4(uColor, intensity * p * 0.4); }`,
+      fragmentShader: `uniform float uTime; uniform vec3 uColor; varying vec3 vNormal; void main() { float intensity = pow(0.7 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 3.0); float p = 0.5 + 0.5 * sin(uTime * 2.0); gl_FragColor = vec4(uColor, intensity * p * 0.25); }`,
       transparent: true, blending: THREE.AdditiveBlending, side: THREE.BackSide
     })
     const pulse = new THREE.Mesh(pulseGeo, pulseMat)
@@ -148,7 +148,7 @@ function HomeHeroScene() {
     const beams: THREE.Line[] = []
     for (let i = 0; i < beamCount; i++) {
       const beamGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 12, 0)])
-      const beamMat = new THREE.LineBasicMaterial({ color: 0xE8894A, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending })
+      const beamMat = new THREE.LineBasicMaterial({ color: 0xCBD5E1, transparent: true, opacity: 0.15, blending: THREE.NormalBlending })
       const beam = new THREE.Line(beamGeo, beamMat)
       beam.rotation.z = (i / beamCount) * Math.PI * 2
       beam.rotation.x = Math.random() * Math.PI
@@ -157,9 +157,10 @@ function HomeHeroScene() {
     }
     const satGroup = new THREE.Group()
     const satellites: THREE.Mesh[] = []
+    const satColors = [0x2563EB, 0x7C3AED, 0xF97316]
     for (let i = 0; i < 8; i++) {
       const sGeo = new THREE.BoxGeometry(0.15, 0.15, 0.15)
-      const sMat = new THREE.MeshBasicMaterial({ color: 0xE3B06B })
+      const sMat = new THREE.MeshBasicMaterial({ color: satColors[i % satColors.length] })
       const s = new THREE.Mesh(sGeo, sMat)
       const dist = 4 + Math.random() * 2
       s.position.set(dist, 0, 0)
@@ -227,7 +228,7 @@ function TypewriterEffect() {
     const interval = setInterval(() => setIndex(p => (p + 1) % words.length), 2500)
     return () => clearInterval(interval)
   }, [])
-  const gradient = 'linear-gradient(90deg, #E8894A, #E3B06B)'
+  const gradient = 'linear-gradient(90deg, #F97316, #F59E0B)'
   return (
     <span className="inline-block min-w-[200px] sm:min-w-[400px]">
       <motion.span key={index} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }}
@@ -265,7 +266,7 @@ export default function Landing() {
   return (
     <div className="text-[var(--text-primary)] transition-colors duration-300">
       {/* ── Hero ── */}
-      <section id="hero" className="relative min-h-screen flex items-center justify-center overflow-hidden">
+      <section id="hero" className="relative min-h-screen flex items-center justify-center overflow-hidden" style={{ background: 'radial-gradient(circle at center, #FFFFFF 0%, #F8FAFC 55%, #EEF2F7 100%)' }}>
         <AnimatePresence mode="wait">
           <HomeHeroScene key={theme} />
         </AnimatePresence>
@@ -319,7 +320,7 @@ export default function Landing() {
                     <button
                       key={d.key}
                       onClick={() => domainContext.setDomain(d.key)}
-                      className="card p-6 flex flex-col items-start gap-3 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(232,137,74,0.15)] hover:border-[var(--aurora)] group text-left"
+                      className="card p-6 flex flex-col items-start gap-3 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(249,115,22,0.15)] hover:border-[var(--aurora)] group text-left"
                     >
                       <div className="w-10 h-10 rounded-xl bg-[var(--bg-depth)] border border-[var(--border-subtle)] flex items-center justify-center group-hover:bg-[var(--aurora)]/10 group-hover:border-[var(--aurora)]/30 transition-colors">
                         <Icon className="w-5 h-5 text-[var(--text-primary)] group-hover:text-[var(--aurora)] transition-colors" />
@@ -353,7 +354,7 @@ export default function Landing() {
               </div>
             </div>
           ) : (
-            <div className="card p-5 max-w-md mx-auto flex items-center justify-between border-[var(--aurora)]/30 bg-gradient-to-r from-[var(--bg-depth)] to-transparent shadow-[0_0_20px_rgba(232,137,74,0.05)]">
+            <div className="card p-5 max-w-md mx-auto flex items-center justify-between border-[var(--aurora)]/30 bg-gradient-to-r from-[var(--bg-depth)] to-transparent shadow-[0_0_20px_rgba(249,115,22,0.05)]">
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-full bg-[var(--aurora)]/10 border border-[var(--aurora)] flex items-center justify-center">
                   <CheckCircle className="w-5 h-5 text-[var(--aurora)]" />
@@ -392,7 +393,7 @@ export default function Landing() {
             <MotionWrapper key={i} delay={i * 0.07}>
               <div className="card p-8 group h-full">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-6 transition-all duration-300 group-hover:scale-110"
-                  style={{ background: 'rgba(232,137,74,0.1)', border: '1px solid rgba(232,137,74,0.2)' }}>
+                  style={{ background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.2)' }}>
                   <f.icon className="w-5 h-5 text-[var(--aurora)]" />
                 </div>
                 <h3 className="text-xl font-bold mb-3">{f.title}</h3>
@@ -407,7 +408,7 @@ export default function Landing() {
       <section className="py-24 container mx-auto px-6">
         <MotionWrapper>
           <div className="card p-12 text-center max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-around gap-8"
-            style={{ background: 'linear-gradient(135deg, rgba(232,137,74,0.05) 0%, rgba(11,11,13,0.95) 100%)' }}>
+            style={{ background: 'linear-gradient(135deg, rgba(249,115,22,0.05) 0%, rgba(241,245,249,0.95) 100%)' }}>
             {[
               { n: '116+', l: 'Keywords Tracked' },
               { n: '4', l: 'B2B Verticals' },

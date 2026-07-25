@@ -53,12 +53,12 @@ export const slideRight: Variants = {
 }
 
 export const glowPulse: Variants = {
-  idle: { boxShadow: '0 0 0px rgba(232,137,74,0)' },
+  idle: { boxShadow: '0 0 0px rgba(249,115,22,0)' },
   pulse: {
     boxShadow: [
-      '0 0 0px rgba(232,137,74,0)',
-      '0 0 20px rgba(232,137,74,0.3)',
-      '0 0 0px rgba(232,137,74,0)',
+      '0 0 0px rgba(249,115,22,0)',
+      '0 0 20px rgba(249,115,22,0.3)',
+      '0 0 0px rgba(249,115,22,0)',
     ],
     transition: { duration: 2, repeat: Infinity, ease: 'easeInOut' },
   },
@@ -68,7 +68,7 @@ export const cardHover = {
   rest: { y: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' },
   hover: {
     y: -3,
-    boxShadow: '0 8px 32px rgba(232,137,74,0.12)',
+    boxShadow: '0 8px 32px rgba(249,115,22,0.12)',
     transition: { duration: 0.2, ease: 'easeOut' },
   },
 }
