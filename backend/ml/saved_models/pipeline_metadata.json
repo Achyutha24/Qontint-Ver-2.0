@@ -1,0 +1,418 @@
+{
+  "version": "v1.2.0-test",
+  "training_date": "2026-07-25T12:14:12.700164Z",
+  "dataset_used": "auto_registry",
+  "num_samples": 50,
+  "num_features": 125,
+  "feature_list": [
+    "word_count",
+    "char_count",
+    "sentence_count",
+    "paragraph_count",
+    "avg_sentence_length",
+    "avg_paragraph_length",
+    "reading_time_minutes",
+    "vocabulary_diversity",
+    "unique_words",
+    "stopword_ratio",
+    "passive_voice_percentage",
+    "question_count",
+    "bullet_count",
+    "numbered_list_count",
+    "code_block_count",
+    "table_count",
+    "image_count",
+    "faq_count",
+    "toc_presence",
+    "h1_count",
+    "h2_count",
+    "h3_count",
+    "h4_count",
+    "heading_distribution_ratio",
+    "heading_hierarchy_score",
+    "primary_keyword_density",
+    "secondary_keyword_density",
+    "keyword_placement_score",
+    "keyword_in_title",
+    "keyword_in_h1",
+    "keyword_in_meta_description",
+    "keyword_variations_count",
+    "lsi_keyword_coverage",
+    "named_entity_count",
+    "person_count",
+    "organization_count",
+    "location_count",
+    "product_count",
+    "entity_diversity",
+    "entity_frequency",
+    "entity_coverage",
+    "flesch_reading_ease",
+    "flesch_kincaid_grade",
+    "gunning_fog",
+    "smog_index",
+    "coleman_liau_index",
+    "automated_readability_index",
+    "embedding_density",
+    "embedding_variance",
+    "semantic_richness",
+    "topic_entropy",
+    "topic_diversity",
+    "intent_confidence",
+    "coverage_score",
+    "semantic_similarity",
+    "internal_links",
+    "external_links",
+    "anchor_diversity",
+    "title_length",
+    "meta_description_length",
+    "url_length",
+    "schema_presence",
+    "canonical_presence",
+    "neo4j_node_count",
+    "neo4j_edge_count",
+    "graph_density",
+    "degree_centrality",
+    "betweenness_centrality",
+    "cluster_count",
+    "avg_cluster_density",
+    "avg_competitor_length",
+    "avg_competitor_readability",
+    "avg_competitor_heading_count",
+    "competitor_semantic_similarity",
+    "competitor_topic_coverage",
+    "competitor_entity_coverage",
+    "unigram_entropy",
+    "bigram_count",
+    "trigram_count",
+    "syllable_avg",
+    "complex_word_ratio",
+    "lexical_density",
+    "sentiment_score",
+    "sentiment_subjectivity",
+    "data_points_count",
+    "percentages_count",
+    "money_mentions_count",
+    "tech_terms_density",
+    "citation_ratio",
+    "link_ratio",
+    "h2_to_paragraph_ratio",
+    "image_to_word_ratio",
+    "code_to_word_ratio",
+    "punctuation_density",
+    "exclamation_count",
+    "uppercase_word_ratio",
+    "word_len_1_4_ratio",
+    "word_len_5_8_ratio",
+    "word_len_9_12_ratio",
+    "word_len_13_plus_ratio",
+    "sentence_len_std",
+    "paragraph_len_std",
+    "kw_match_first_p",
+    "kw_match_last_p",
+    "kw_in_h2",
+    "kw_in_h3",
+    "serp_overlap_score",
+    "entity_type_ratio",
+    "tech_term_density",
+    "entity_cooccurrence_index",
+    "semantic_vector_norm",
+    "cosine_sim_variance",
+    "topic_cluster_spread",
+    "intent_informational_score",
+    "intent_transactional_score",
+    "intent_navigational_score",
+    "intent_commercial_score",
+    "content_freshness_score",
+    "outbound_domain_auth_proxy",
+    "readability_uniformity",
+    "subtopic_completeness_index",
+    "keyword_in_url",
+    "title_word_count",
+    "meta_word_count",
+    "h1_word_count"
+  ],
+  "trained_models_count": 10,
+  "total_models": 10,
+  "model_details": {
+    "rank_prediction": {
+      "status": "trained",
+      "model_name": "rank_prediction_model",
+      "algorithm": "HistGradientBoostingRegressor",
+      "training_metrics": {
+        "mae": 0.2696,
+        "mse": 0.2099,
+        "rmse": 0.4581,
+        "r2": 0.3109
+      },
+      "evaluation_metrics": {
+        "mae": 0.11,
+        "mse": 0.027,
+        "rmse": 0.1643,
+        "r2": 1.0
+      },
+      "hyperparameters": {
+        "tuning": "standard_grid"
+      },
+      "artifact_path": "C:\\Users\\achyu\\Desktop\\Qontint Backup\\backend\\ml\\saved_models\\rank_prediction_model.joblib",
+      "top_features": []
+    },
+    "novelty_score": {
+      "status": "trained",
+      "model_name": "novelty_score_model",
+      "algorithm": "HistGradientBoostingRegressor",
+      "training_metrics": {
+        "mae": 3.2548,
+        "mse": 14.7658,
+        "rmse": 3.8426,
+        "r2": 0.1531
+      },
+      "evaluation_metrics": {
+        "mae": 5.86,
+        "mse": 38.956,
+        "rmse": 6.2415,
+        "r2": -2.5075
+      },
+      "hyperparameters": {
+        "tuning": "standard_grid"
+      },
+      "artifact_path": "C:\\Users\\achyu\\Desktop\\Qontint Backup\\backend\\ml\\saved_models\\novelty_score_model.joblib",
+      "top_features": []
+    },
+    "content_quality": {
+      "status": "trained",
+      "model_name": "content_quality_model",
+      "algorithm": "ExtraTreesRegressor",
+      "training_metrics": {
+        "mae": 0.0,
+        "mse": 0.0,
+        "rmse": 0.0,
+        "r2": 1.0
+      },
+      "evaluation_metrics": {
+        "mae": 0.0,
+        "mse": 0.0,
+        "rmse": 0.0,
+        "r2": 1.0
+      },
+      "hyperparameters": {
+        "tuning": "standard_grid"
+      },
+      "artifact_path": "C:\\Users\\achyu\\Desktop\\Qontint Backup\\backend\\ml\\saved_models\\content_quality_model.joblib",
+      "top_features": [
+        [
+          "word_count",
+          0.0
+        ],
+        [
+          "char_count",
+          0.0
+        ],
+        [
+          "sentence_count",
+          0.0
+        ],
+        [
+          "paragraph_count",
+          0.0
+        ],
+        [
+          "avg_sentence_length",
+          0.0
+        ],
+        [
+          "avg_paragraph_length",
+          0.0
+        ],
+        [
+          "reading_time_minutes",
+          0.0
+        ],
+        [
+          "vocabulary_diversity",
+          0.0
+        ],
+        [
+          "unique_words",
+          0.0
+        ],
+        [
+          "stopword_ratio",
+          0.0
+        ]
+      ]
+    },
+    "authority_score": {
+      "status": "trained",
+      "model_name": "authority_score_model",
+      "algorithm": "HistGradientBoostingRegressor",
+      "training_metrics": {
+        "mae": 3.0906,
+        "mse": 15.9882,
+        "rmse": 3.9985,
+        "r2": 0.5035
+      },
+      "evaluation_metrics": {
+        "mae": 3.92,
+        "mse": 24.306,
+        "rmse": 4.9301,
+        "r2": -0.4528
+      },
+      "hyperparameters": {
+        "tuning": "standard_grid"
+      },
+      "artifact_path": "C:\\Users\\achyu\\Desktop\\Qontint Backup\\backend\\ml\\saved_models\\authority_score_model.joblib",
+      "top_features": []
+    },
+    "ctr_prediction": {
+      "status": "trained",
+      "model_name": "ctr_prediction_model",
+      "algorithm": "HistGradientBoostingRegressor",
+      "training_metrics": {
+        "mae": 1.9579,
+        "mse": 8.2681,
+        "rmse": 2.8754,
+        "r2": 0.4677
+      },
+      "evaluation_metrics": {
+        "mae": 3.17,
+        "mse": 16.741,
+        "rmse": 4.0916,
+        "r2": -0.3367
+      },
+      "hyperparameters": {
+        "tuning": "standard_grid"
+      },
+      "artifact_path": "C:\\Users\\achyu\\Desktop\\Qontint Backup\\backend\\ml\\saved_models\\ctr_prediction_model.joblib",
+      "top_features": []
+    },
+    "search_intent": {
+      "status": "trained",
+      "model_name": "search_intent_model",
+      "algorithm": "LogisticRegression",
+      "training_metrics": {
+        "accuracy": 0.75
+      },
+      "evaluation_metrics": {
+        "accuracy": 0.2
+      },
+      "hyperparameters": {
+        "tuning": "standard_grid"
+      },
+      "artifact_path": "C:\\Users\\achyu\\Desktop\\Qontint Backup\\backend\\ml\\saved_models\\search_intent_model.joblib",
+      "top_features": []
+    },
+    "topic_coverage": {
+      "status": "trained",
+      "model_name": "topic_coverage_model",
+      "algorithm": "HistGradientBoostingRegressor",
+      "training_metrics": {
+        "mae": 4.2724,
+        "mse": 25.5477,
+        "rmse": 5.0545,
+        "r2": 0.7165
+      },
+      "evaluation_metrics": {
+        "mae": 4.17,
+        "mse": 26.351,
+        "rmse": 5.1333,
+        "r2": 0.6032
+      },
+      "hyperparameters": {
+        "tuning": "standard_grid"
+      },
+      "artifact_path": "C:\\Users\\achyu\\Desktop\\Qontint Backup\\backend\\ml\\saved_models\\topic_coverage_model.joblib",
+      "top_features": []
+    },
+    "semantic_similarity": {
+      "status": "trained",
+      "model_name": "semantic_similarity_model",
+      "algorithm": "Baseline",
+      "training_metrics": {
+        "mae": 0.2902,
+        "mse": 0.177,
+        "rmse": 0.4207,
+        "r2": -19.4951
+      },
+      "evaluation_metrics": {
+        "mae": 0.3085,
+        "mse": 0.2194,
+        "rmse": 0.4684,
+        "r2": -109.2812
+      },
+      "hyperparameters": {
+        "tuning": "standard_grid"
+      },
+      "artifact_path": null,
+      "top_features": []
+    },
+    "content_gap": {
+      "status": "trained",
+      "model_name": "content_gap_model",
+      "algorithm": "Baseline",
+      "training_metrics": {
+        "mae": 14.005,
+        "mse": 291.133,
+        "rmse": 17.0626,
+        "r2": -2.0648
+      },
+      "evaluation_metrics": {
+        "mae": 13.08,
+        "mse": 239.352,
+        "rmse": 15.471,
+        "r2": -2.5062
+      },
+      "hyperparameters": {
+        "tuning": "standard_grid"
+      },
+      "artifact_path": null,
+      "top_features": []
+    },
+    "readability_score": {
+      "status": "trained",
+      "model_name": "readability_score_model",
+      "algorithm": "RandomForestRegressor",
+      "training_metrics": {
+        "mae": 1.454,
+        "mse": 3.7265,
+        "rmse": 1.9304,
+        "r2": 0.8774
+      },
+      "evaluation_metrics": {
+        "mae": 3.29,
+        "mse": 14.467,
+        "rmse": 3.8036,
+        "r2": 0.4387
+      },
+      "hyperparameters": {
+        "tuning": "standard_grid"
+      },
+      "artifact_path": "C:\\Users\\achyu\\Desktop\\Qontint Backup\\backend\\ml\\saved_models\\readability_score_model.joblib",
+      "top_features": [
+        [
+          "char_count",
+          0.7546
+        ],
+        [
+          "word_count",
+          0.1257
+        ],
+        [
+          "avg_sentence_length",
+          0.054
+        ],
+        [
+          "paragraph_count",
+          0.0361
+        ],
+        [
+          "sentence_count",
+          0.0296
+        ],
+        [
+          "avg_paragraph_length",
+          0.0
+        ]
+      ]
+    }
+  }
+}

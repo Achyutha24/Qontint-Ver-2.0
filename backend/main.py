@@ -38,7 +38,7 @@ from models.schemas import AnalyzeRequest, Recommendation
 # ── Routers ───────────────────────────────────────────────────────────────────
 from routers import (
     health, keywords, serp, entities, graph,
-    novelty, authority, ranking, generation, slm, dashboard, youtube, taxonomy, serp_intel
+    novelty, authority, ranking, generation, slm, dashboard, youtube, taxonomy, serp_intel, ml
 )
 
 logger = logging.getLogger(__name__)
@@ -85,6 +85,13 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Ranking model warmed up")
     except Exception as exc:
         logger.warning("⚠️  Ranking model warmup failed: %s", exc)
+
+    try:
+        from ml.inference.service import MLInferenceService
+        MLInferenceService.get_instance()
+        logger.info("✅ Local ML Inference Service initialized")
+    except Exception as exc:
+        logger.warning("⚠️  Local ML Service initialization failed: %s", exc)
 
     # Ensure Mock Neo4j indexes (does nothing in mock)
     try:
@@ -140,6 +147,7 @@ app.include_router(dashboard.router)
 app.include_router(youtube.router)
 app.include_router(taxonomy.router)
 app.include_router(serp_intel.router)
+app.include_router(ml.router)
 
 
 # ── Core Pipeline Endpoint: POST /api/v1/analyze ──────────────────────────────

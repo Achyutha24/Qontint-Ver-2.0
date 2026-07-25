@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Briefcase, ChevronDown } from 'lucide-react';
 import { useDomain, GLOBAL_DOMAINS } from '../../context/DomainContext';
 
 export default function WorkspaceDropdown() {
+  const navigate = useNavigate();
   const { domain, setDomain, activeDomainName } = useDomain();
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -71,6 +73,15 @@ export default function WorkspaceDropdown() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="p-2 border-t border-[var(--border-subtle)] bg-[var(--bg-depth)]">
+              <button
+                onClick={() => { navigate('/app/workspace'); setOpen(false); }}
+                className="w-full text-center px-3 py-1.5 rounded-lg text-xs font-bold bg-[var(--aurora)]/10 text-[var(--aurora)] hover:bg-[var(--aurora)]/20 transition-colors"
+              >
+                Open Workspace Operational Hub →
+              </button>
             </div>
           </motion.div>
         )}

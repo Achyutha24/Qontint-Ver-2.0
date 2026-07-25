@@ -1,4 +1,4 @@
-﻿/**
+/**
  * RegisterPage — Registration with inline domain selection.
  * Users choose their workspace domain before entering the app.
  */
@@ -275,7 +275,7 @@ export default function RegisterPage() {
               }
             ].map((feature, idx) => (
               <div key={idx} className="card p-5 flex items-start gap-4 bg-[var(--bg-depth)]/50 border-[var(--border-subtle)] hover:border-[var(--aurora)]/20 transition-colors">
-                <div className="w-10 h-10 rounded-lg bg-black/40 border border-[var(--border-subtle)] flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 rounded-lg bg-[var(--bg-depth)] border border-[var(--border-subtle)] flex items-center justify-center flex-shrink-0">
                   <feature.icon className="w-5 h-5 text-[var(--aurora)]" />
                 </div>
                 <div>

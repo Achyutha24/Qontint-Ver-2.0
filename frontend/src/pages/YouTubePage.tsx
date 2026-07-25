@@ -1,11 +1,7 @@
-﻿import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Video, Target, Zap, BarChart2, AlertTriangle } from 'lucide-react'
 import * as THREE from 'three'
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
-import { GlitchPass } from 'three/examples/jsm/postprocessing/GlitchPass.js'
 import { useThreeScene } from '../hooks/useThreeScene'
 import { useTheme } from '../hooks/useTheme'
 import { useScrollReveal } from '../hooks/useScrollReveal'
@@ -317,7 +313,7 @@ export default function YouTubePage() {
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    className="flex-1 px-4 py-2 text-sm bg-black/20 border-none focus:ring-1 focus:ring-[var(--aurora)]"
+                    className="flex-1 px-4 py-2 text-sm bg-[var(--bg-depth)] border-none focus:ring-1 focus:ring-[var(--aurora)]"
                     placeholder="https://www.youtube.com/watch?v=..."
                     value={videoUrl}
                     onChange={e => setVideoUrl(e.target.value)}

@@ -6,9 +6,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import * as THREE from 'three'
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { LucideIcon } from 'lucide-react'
 import {
@@ -200,7 +197,7 @@ function HomeHeroScene() {
       })
       satGroup.rotation.z = t * 0.1
       satellites.forEach(s => { s.rotation.x = t * 2; s.rotation.y = t * 2 })
-      if (composer) composer.render(); else renderer.render(scene, camera)
+      renderer.render(scene, camera)
     }
     animate()
 

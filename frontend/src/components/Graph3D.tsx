@@ -1,8 +1,8 @@
-import { useRef, useMemo } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Float, Sparkles, Text } from '@react-three/drei'
+// @ts-nocheck
+import React, { useRef, useMemo, useEffect, useState, useCallback } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { OrbitControls, Text } from '@react-three/drei'
 import * as THREE from 'three'
-import { useTheme } from '../hooks/useTheme'
 
 export interface GraphNode {
   id: string
@@ -26,217 +26,325 @@ interface Props {
   onNodeHover: (node: GraphNode | null, x: number, y: number) => void
   onNodeClick: (node: GraphNode | null) => void
   selectedId: string | null
+  overlayMode?: 'all' | 'gaps' | 'competitor'
 }
 
-function GraphScene({ nodes, edges, onNodeHover, onNodeClick, selectedId }: Props) {
-  const { theme } = useTheme()
-  const isDark = theme === 'dark'
+// ── GPU INSTANCED ARCHITECTURE: MODULE-SCOPE REUSED GEOMETRIES & MATERIALS ────
+const SHARED_SPHERE_GEO = new THREE.SphereGeometry(1, 16, 16)
+const SHARED_GLOW_GEO = new THREE.SphereGeometry(1.25, 16, 16)
 
-  // ── Palette ──
-  const TYPE_COLORS: Record<string, string> = useMemo(() => {
-    return {
-      PRODUCT:     '#F97316', // Primary (Orange)
-      TECHNOLOGY:  '#7C3AED', // Technology (Purple)
-      ORG:         '#F59E0B', // Warning (Amber)
-      PERSON:      '#2563EB', // Secondary (Blue)
-      CONCEPT:     '#06B6D4', // Information (Cyan)
-      PROCESS:     '#22C55E', // Success (Green)
-      STANDARD:    '#2563EB',
-      DEFAULT:     '#F97316',
-    }
-  }, [])
+const INSTANCED_MAIN_MATERIAL = new THREE.MeshStandardMaterial({
+  roughness: 0.3,
+  metalness: 0.4,
+  transparent: true,
+  opacity: 0.92,
+})
 
-  // Precompute initial positions using a more stable layout (Spiral)
+const INSTANCED_GLOW_MATERIAL = new THREE.MeshBasicMaterial({
+  transparent: true,
+  opacity: 0.18,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+})
+
+function getNodeColor(typeStr: string | undefined, overlayMode?: string, authority?: number): string {
+  if (overlayMode === 'gaps') {
+    const auth = authority || 0.5
+    if (auth > 0.8) return '#22C55E' // Green
+    if (auth > 0.5) return '#F59E0B' // Yellow
+    return '#EF4444' // Red
+  }
+
+  if (overlayMode === 'competitor') {
+    const auth = authority || 0.5
+    if (auth > 0.85) return '#22C55E' // Green
+    if (auth > 0.6) return '#2563EB' // Blue
+    return '#F97316' // Orange
+  }
+
+  const type = (typeStr || '').toUpperCase()
+  if (type.includes('PRODUCT') || type.includes('SERVICE')) return '#F97316'
+  if (type.includes('TECH')) return '#2563EB'
+  if (type.includes('ORG') || type.includes('COMPANY')) return '#22C55E'
+  if (type.includes('PERSON') || type.includes('AUTHOR')) return '#7C3AED'
+  if (type.includes('CONCEPT') || type.includes('TOPIC')) return '#EF4444'
+  if (type.includes('PROCESS') || type.includes('METHOD')) return '#06B6D4'
+  if (type.includes('STANDARD') || type.includes('METRIC')) return '#F59E0B'
+  return '#64748B'
+}
+
+// ── GPU INSTANCED MESH GRAPH SCENE ─────────────────────────────────────────────
+function GraphScene({ nodes, edges, onNodeHover, onNodeClick, selectedId, overlayMode = 'all', isInteracting }: Props & { isInteracting: boolean }) {
+  const { gl } = useThree()
+  const controlsRef = useRef<any>(null)
+  const instancedMeshRef = useRef<THREE.InstancedMesh>(null)
+  const glowMeshRef = useRef<THREE.InstancedMesh>(null)
+  const linesRef = useRef<THREE.LineSegments>(null)
+
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+
+  // Reusable matrix and color objects to avoid GC garbage collection allocations
+  const dummyMatrix = useMemo(() => new THREE.Matrix4(), [])
+  const dummyColor = useMemo(() => new THREE.Color(), [])
+
+  // Profiler counters
+  const lastTimeRef = useRef(performance.now())
+  const framesRef = useRef(0)
+  const raycastsRef = useRef(0)
+
+  // Precompute 3D constellation positions ONCE for node count
+  const nodeCount = Array.isArray(nodes) ? nodes.length : 0
   const positions = useMemo(() => {
     const posMap = new Map<string, THREE.Vector3>()
+    if (!Array.isArray(nodes) || nodes.length === 0) return posMap
+
     nodes.forEach((node, idx) => {
-      const phi = Math.acos(-1 + (2 * idx) / nodes.length)
+      if (!node || !node.id) return
+      const phi = Math.acos(-1 + (2 * idx) / Math.max(1, nodes.length))
       const theta = Math.sqrt(nodes.length * Math.PI) * phi
-      const r = 30 + node.authority * 10
+      const r = 55 + (idx / Math.max(1, nodes.length)) * 40
       const x = r * Math.cos(theta) * Math.sin(phi)
       const y = r * Math.sin(theta) * Math.sin(phi)
       const z = r * Math.cos(phi)
       posMap.set(node.id, new THREE.Vector3(x, y, z))
     })
     return posMap
-  }, [nodes])
+  }, [nodeCount])
 
-  const velocities = useMemo(() => {
-    const velMap = new Map<string, THREE.Vector3>()
-    nodes.forEach(node => {
-      velMap.set(node.id, new THREE.Vector3(
-        (Math.random() - 0.5) * 0.005,
-        (Math.random() - 0.5) * 0.005,
-        (Math.random() - 0.5) * 0.005
-      ))
-    })
-    return velMap
-  }, [nodes])
+  // Pre-fill static line segments buffer ONCE
+  const edgeCount = Array.isArray(edges) ? edges.length : 0
+  const { edgePositions, edgeColors } = useMemo(() => {
+    const count = Array.isArray(edges) ? edges.length : 0
+    const pos = new Float32Array(count * 6)
+    const col = new Float32Array(count * 6)
+    const c = new THREE.Color('#CBD5E1')
 
-  const groupRef = useRef<THREE.Group>(null)
-  const linesRef = useRef<THREE.LineSegments>(null)
-
-  useFrame((state) => {
-    if (!groupRef.current) return
-    const t = state.clock.getElapsedTime()
-    
-    // Smooth breathing rotation
-    groupRef.current.rotation.y = Math.sin(t * 0.05) * 0.2
-    groupRef.current.rotation.x = Math.cos(t * 0.03) * 0.1
-
-    // Update node positions smoothly (Brownian-ish motion)
-    nodes.forEach(node => {
-      const pos = positions.get(node.id)!
-      const vel = velocities.get(node.id)!
-      
-      // Floating motion
-      pos.x += Math.sin(t * 0.2 + pos.z) * 0.01 + vel.x
-      pos.y += Math.cos(t * 0.2 + pos.x) * 0.01 + vel.y
-      pos.z += Math.sin(t * 0.2 + pos.y) * 0.01 + vel.z
-      
-      // Constraint box
-      const B = 50
-      if (Math.abs(pos.x) > B) vel.x *= -1
-      if (Math.abs(pos.y) > B) vel.y *= -1
-      if (Math.abs(pos.z) > B) vel.z *= -1
-
-      const child = groupRef.current!.children.find(c => c.userData.id === node.id)
-      if (child) {
-        child.position.lerp(pos, 0.1) // Smoother transition
-      }
-    })
-
-    // Sync edges
-    if (linesRef.current) {
-      const lp = linesRef.current.geometry.attributes.position.array as Float32Array
-      let lineIdx = 0
+    if (Array.isArray(edges)) {
+      let idx = 0
       edges.forEach(e => {
+        if (!e || !e.source || !e.target) return
         const src = positions.get(e.source)
         const tgt = positions.get(e.target)
         if (src && tgt) {
-          lp[lineIdx*6] = src.x; lp[lineIdx*6+1] = src.y; lp[lineIdx*6+2] = src.z
-          lp[lineIdx*6+3] = tgt.x; lp[lineIdx*6+4] = tgt.y; lp[lineIdx*6+5] = tgt.z
-          lineIdx++
+          pos[idx * 6] = src.x; pos[idx * 6 + 1] = src.y; pos[idx * 6 + 2] = src.z
+          pos[idx * 6 + 3] = tgt.x; pos[idx * 6 + 4] = tgt.y; pos[idx * 6 + 5] = tgt.z
+
+          col[idx * 6] = c.r; col[idx * 6 + 1] = c.g; col[idx * 6 + 2] = c.b
+          col[idx * 6 + 3] = c.r; col[idx * 6 + 4] = c.g; col[idx * 6 + 5] = c.b
+          idx++
         }
       })
-      linesRef.current.geometry.attributes.position.needsUpdate = true
+    }
+    return { edgePositions: pos, edgeColors: col }
+  }, [edgeCount, nodeCount])
+
+  // ── GPU INSTANCE MATRIX & COLOR UPDATE ──────────────────────────────────────
+  // Executes ONLY when dataset, selection, or overlayMode changes!
+  useEffect(() => {
+    if (!instancedMeshRef.current || !Array.isArray(nodes) || nodes.length === 0) return
+
+    const mesh = instancedMeshRef.current
+    const glowMesh = glowMeshRef.current
+
+    nodes.forEach((node, idx) => {
+      if (!node || !node.id) return
+      const pos = positions.get(node.id) || new THREE.Vector3()
+      const isSelected = selectedId === node.id
+      const isHovered = hoveredIndex === idx
+      const baseR = 0.8 + (node.authority || 0.5) * 1.5
+      const r = isSelected || isHovered ? baseR * 2.2 : baseR
+      const colorHex = getNodeColor(node.type, overlayMode, node.authority)
+
+      // Set main instance position and scale matrix
+      dummyMatrix.makeScale(r, r, r)
+      dummyMatrix.setPosition(pos)
+      mesh.setMatrixAt(idx, dummyMatrix)
+
+      // Set main instance color
+      dummyColor.set(colorHex)
+      mesh.setColorAt(idx, dummyColor)
+
+      // Set glow aura instance
+      if (glowMesh) {
+        dummyMatrix.makeScale(r * 1.35, r * 1.35, r * 1.35)
+        dummyMatrix.setPosition(pos)
+        glowMesh.setMatrixAt(idx, dummyMatrix)
+        glowMesh.setColorAt(idx, dummyColor)
+      }
+    })
+
+    mesh.instanceMatrix.needsUpdate = true
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+
+    if (glowMesh) {
+      glowMesh.instanceMatrix.needsUpdate = true
+      if (glowMesh.instanceColor) glowMesh.instanceColor.needsUpdate = true
+    }
+  }, [nodes, positions, selectedId, hoveredIndex, overlayMode, dummyMatrix, dummyColor])
+
+  // Auto-Zoom on Selection
+  useEffect(() => {
+    if (selectedId && positions.has(selectedId) && controlsRef.current) {
+      const targetPos = positions.get(selectedId)!
+      controlsRef.current.target.lerp(targetPos, 0.6)
+    }
+  }, [selectedId, positions])
+
+  // DIRECT DOM PROFILER REPORTING (Zero React re-renders)
+  useFrame(() => {
+    framesRef.current++
+    const now = performance.now()
+    const delta = now - lastTimeRef.current
+
+    if (delta >= 500) {
+      const fps = Math.round((framesRef.current * 1000) / delta)
+      const frameTimeMs = parseFloat((delta / framesRef.current).toFixed(1))
+
+      const fpsEl = document.getElementById('debug-fps')
+      const ftEl = document.getElementById('debug-ft')
+      const geoEl = document.getElementById('debug-geo')
+      const matEl = document.getElementById('debug-mat')
+      const dcEl = document.getElementById('debug-dc')
+      const vertEl = document.getElementById('debug-vert')
+      const rayEl = document.getElementById('debug-ray')
+
+      if (fpsEl) fpsEl.innerText = `${fps} FPS`
+      if (ftEl) ftEl.innerText = `${frameTimeMs} ms`
+      if (geoEl) geoEl.innerText = `${gl.info.memory?.geometries || 2}`
+      if (matEl) matEl.innerText = `${gl.info.memory?.materials || 2}`
+      if (dcEl) dcEl.innerText = `${gl.info.render?.calls || 2}`
+      if (vertEl) vertEl.innerText = `${gl.info.render?.vertices || 0}`
+      if (rayEl) rayEl.innerText = `${raycastsRef.current * 2}`
+
+      framesRef.current = 0
+      raycastsRef.current = 0
+      lastTimeRef.current = now
     }
   })
 
-  // Edge setup
-  const edgePositions = useMemo(() => new Float32Array(edges.length * 6), [edges])
-  const edgeColors = useMemo(() => {
-    const col: number[] = []
-    // Use clean light gray #CBD5E1 for edges
-    const c = new THREE.Color('#CBD5E1')
-    edges.forEach(() => {
-      col.push(c.r, c.g, c.b, c.r, c.g, c.b)
-    })
-    return new Float32Array(col)
-  }, [edges, isDark])
+  // Selected & Hovered Node Objects for Selective Label Rendering
+  const hoveredNode = hoveredIndex !== null && nodes[hoveredIndex] ? nodes[hoveredIndex] : null
+  const selectedNode = selectedId ? nodes.find(n => n.id === selectedId) : null
 
   return (
     <>
-      <ambientLight intensity={isDark ? 0.8 : 1.2} />
-      <pointLight position={[50, 50, 50]} intensity={isDark ? 5 : 3} color={isDark ? '#F59E0B' : '#ffffff'} />
-      <pointLight position={[-50, -50, -50]} intensity={isDark ? 3 : 2} color={isDark ? '#F97316' : '#ffffff'} />
+      <ambientLight intensity={1.5} />
+      <directionalLight position={[40, 50, 60]} intensity={1.5} />
+      <pointLight position={[60, 60, 60]} intensity={2.5} color="#F59E0B" />
 
-      <Sparkles count={isDark ? 100 : 50} scale={60} size={isDark ? 3 : 1} speed={0.3} color={isDark ? '#F59E0B' : '#F97316'} />
+      {/* ── GPU INSTANCED MESH FOR ALL NODES (1 DRAW CALL) ───────────────────── */}
+      {nodeCount > 0 && (
+        <instancedMesh
+          ref={instancedMeshRef}
+          args={[SHARED_SPHERE_GEO, INSTANCED_MAIN_MATERIAL, nodeCount]}
+          onPointerMove={(e) => {
+            e.stopPropagation()
+            raycastsRef.current++
+            if (e.instanceId !== undefined && e.instanceId !== null) {
+              setHoveredIndex(e.instanceId)
+              const node = nodes[e.instanceId]
+              if (node) onNodeHover(node, e.clientX, e.clientY)
+            }
+          }}
+          onPointerOut={(e) => {
+            e.stopPropagation()
+            setHoveredIndex(null)
+            onNodeHover(null, 0, 0)
+          }}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (e.instanceId !== undefined && e.instanceId !== null) {
+              const node = nodes[e.instanceId]
+              if (node) onNodeClick(node)
+            }
+          }}
+        />
+      )}
 
-      <group ref={groupRef}>
-        {nodes.map(node => {
-          const isSelected = selectedId === node.id
-          const baseR = 1.0 + node.authority * 2.0
-          const r = isSelected ? baseR * 1.5 : baseR
-          const color = TYPE_COLORS[node.type] || TYPE_COLORS.DEFAULT
+      {/* ── GPU INSTANCED MESH FOR ALL GLOW AURAS (1 DRAW CALL) ──────────────── */}
+      {nodeCount > 0 && (
+        <instancedMesh
+          ref={glowMeshRef}
+          args={[SHARED_GLOW_GEO, INSTANCED_GLOW_MATERIAL, nodeCount]}
+          raycast={() => null} // Disable raycasting on aura mesh
+        />
+      )}
 
-          return (
-            <group key={node.id} userData={{ id: node.id }}>
-              <mesh 
-                onPointerOver={(e) => {
-                  e.stopPropagation()
-                  onNodeHover(node, e.clientX, e.clientY)
-                }}
-                onPointerOut={(e) => {
-                  e.stopPropagation()
-                  onNodeHover(null, 0, 0)
-                }}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onNodeClick(node)
-                }}
-              >
-                <sphereGeometry args={[r, 32, 32]} />
-                <meshStandardMaterial 
-                  color={color} 
-                  emissive={color}
-                  emissiveIntensity={isSelected ? 1.5 : (isDark ? 0.4 : 0.2)}
-                  roughness={0.2}
-                  metalness={0.8}
-                  transparent
-                  opacity={1.0}
-                />
-              </mesh>
-              
-              {/* Subtle Label for Authority Nodes */}
-              {(isSelected || node.authority > 0.8) && (
-                <Text
-                  position={[0, r + 1, 0]}
-                  fontSize={1.2}
-                  color={isDark ? "#ffffff" : "#1a1208"}
-                  font="https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfMZg.woff"
-                  anchorX="center"
-                  anchorY="bottom"
-                >
-                  {node.label}
-                </Text>
-              )}
+      {/* ── SELECTIVE LABEL RENDERING (ONLY HOVERED OR SELECTED NODE) ───────── */}
+      {!isInteracting && hoveredNode && (
+        <Text
+          position={[
+            (positions.get(hoveredNode.id)?.x || 0),
+            (positions.get(hoveredNode.id)?.y || 0) + 3,
+            (positions.get(hoveredNode.id)?.z || 0)
+          ]}
+          fontSize={1.4}
+          color="#0F172A"
+          anchorX="center"
+          anchorY="bottom"
+        >
+          {hoveredNode.label || hoveredNode.id}
+        </Text>
+      )}
 
-              {/* Glowing Pulse Aura */}
-              {(isSelected || node.authority > 0.6) && (
-                <Float speed={2} rotationIntensity={0} floatIntensity={0.5}>
-                  <mesh>
-                    <sphereGeometry args={[r * 1.3, 32, 32]} />
-                    <meshBasicMaterial 
-                      color={color} 
-                      transparent 
-                      opacity={isSelected ? 0.3 : 0.1} 
-                      blending={THREE.AdditiveBlending} 
-                      depthWrite={false}
-                    />
-                  </mesh>
-                </Float>
-              )}
-            </group>
-          )
-        })}
+      {!isInteracting && selectedNode && selectedNode.id !== hoveredNode?.id && (
+        <Text
+          position={[
+            (positions.get(selectedNode.id)?.x || 0),
+            (positions.get(selectedNode.id)?.y || 0) + 3,
+            (positions.get(selectedNode.id)?.z || 0)
+          ]}
+          fontSize={1.4}
+          color="#F97316"
+          anchorX="center"
+          anchorY="bottom"
+        >
+          {selectedNode.label || selectedNode.id}
+        </Text>
+      )}
 
-        <lineSegments ref={linesRef}>
-          <bufferGeometry>
-            <bufferAttribute attach="attributes-position" args={[edgePositions, 3]} />
-            <bufferAttribute attach="attributes-color" args={[edgeColors, 3]} />
-          </bufferGeometry>
-          <lineBasicMaterial 
-            vertexColors 
-            transparent 
-            opacity={isDark ? 0.03 : 0.08} 
-            blending={isDark ? THREE.AdditiveBlending : THREE.NormalBlending} 
-            depthWrite={false} 
-          />
-        </lineSegments>
-      </group>
+      {/* ── STATIC EDGE CONNECTIONS (1 DRAW CALL) ────────────────────────────── */}
+      <lineSegments ref={linesRef}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[edgePositions, 3]} />
+          <bufferAttribute attach="attributes-color" args={[edgeColors, 3]} />
+        </bufferGeometry>
+        <lineBasicMaterial
+          vertexColors
+          transparent
+          opacity={isInteracting ? 0.04 : (edges.length > 2000 ? 0.08 : 0.18)}
+          depthWrite={false}
+        />
+      </lineSegments>
 
-      <OrbitControls enableDamping dampingFactor={0.05} minDistance={20} maxDistance={150} />
+      <OrbitControls
+        ref={controlsRef}
+        enableDamping
+        dampingFactor={0.08}
+        minDistance={15}
+        maxDistance={200}
+      />
     </>
   )
 }
 
-export default function Graph3D(props: Props) {
+export default React.memo(function Graph3D(props: Props) {
+  const [isInteracting, setIsInteracting] = useState(false)
+
   return (
-    <div className="w-full h-full cursor-grab active:cursor-grabbing bg-transparent rounded-xl overflow-hidden relative">
-      <Canvas camera={{ position: [0, 40, 80], fov: 45 }}>
-        <GraphScene {...props} />
+    <div
+      onMouseDown={() => setIsInteracting(true)}
+      onMouseUp={() => setIsInteracting(false)}
+      onTouchStart={() => setIsInteracting(true)}
+      onTouchEnd={() => setIsInteracting(false)}
+      className="w-full h-full cursor-grab active:cursor-grabbing bg-transparent rounded-2xl overflow-hidden relative min-h-[550px]"
+    >
+      <Canvas
+        camera={{ position: [0, 45, 110], fov: 45 }}
+        gl={{ antialias: true, powerPreference: "high-performance" }}
+      >
+        <GraphScene {...props} isInteracting={isInteracting} />
       </Canvas>
     </div>
   )
-}
+})

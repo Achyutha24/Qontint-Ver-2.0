@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Cpu, AlertTriangle } from 'lucide-react'
 import * as THREE from 'three'
@@ -225,7 +225,7 @@ export default function AnalyzePage() {
                 <label className="font-mono text-xs text-[var(--text-muted)] uppercase tracking-wider mb-1.5 block">
                   Global Domain
                 </label>
-                <div className="w-full px-4 py-2.5 text-sm rounded-lg border border-[var(--border-subtle)] bg-black/20 text-[var(--text-muted)] flex items-center justify-between h-[42px]">
+                <div className="w-full px-4 py-2.5 text-sm rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-depth)] text-[var(--text-muted)] flex items-center justify-between h-[42px]">
                   <span className="truncate">{activeDomainName}</span>
                   <span className="w-2 h-2 rounded-full bg-[var(--aurora)] shadow-[0_0_8px_var(--aurora)] animate-pulse" />
                 </div>
