@@ -21,19 +21,24 @@
  *  - SECTION 10: Report History & Comparison Management
  *  - SECTION 11: Export & Share Capabilities
  */
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   FileText, Download, Share2, Printer, CheckCircle2, AlertTriangle, Shield, Award,
   HelpCircle, ChevronDown, ChevronUp, Sparkles, TrendingUp, BarChart3, PieChart,
   Layers, Zap, Search, Globe, Network, ArrowUpRight, Copy, Trash2, Edit3, Filter,
-  ArrowRight, ExternalLink, RefreshCw, Star, Lock, Clock
+  ArrowRight, ExternalLink, RefreshCw, Star, Lock, Clock, Cpu, Eye
 } from 'lucide-react'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, RadarChart, PolarGrid,
   PolarAngleAxis, PolarRadiusAxis, Radar, PieChart as RePieChart, Pie, Cell, LineChart, Line
 } from 'recharts'
 import { useDomain } from '../context/DomainContext'
+import PageContainer from '../components/layout/PageContainer'
+import PageHeader from '../components/layout/PageHeader'
+import ContentContainer from '../components/layout/ContentContainer'
+import ActionToolbar from '../components/layout/ActionToolbar'
 
 // ── Chart Colors ─────────────────────────────────────────────────────────────
 const COLORS = ['#F97316', '#2563EB', '#22C55E', '#7C3AED', '#EF4444', '#06B6D4', '#F59E0B']
@@ -60,8 +65,24 @@ interface HistoricalReport {
   status: 'Completed' | 'Archived'
 }
 
+import {
+  getReportsFromStorage,
+  toggleFavoriteReport,
+  toggleArchiveReport,
+  deleteReportFromRepository,
+  type ReportItem
+} from '../utils/reportRepository'
+
 export default function ReportsPage() {
+  const navigate = useNavigate()
   const { domain: verticalFilter, activeDomainName } = useDomain()
+
+  // Repository State
+  const [repository, setRepository] = useState<ReportItem[]>([])
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
+  const [activeCategoryTab, setActiveCategoryTab] = useState<string>('All')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortBy, setSortBy] = useState<'Newest' | 'Oldest' | 'Score' | 'Alphabetical'>('Newest')
 
   // UI State
   const [activePriorityTab, setActivePriorityTab] = useState<'All' | 'Critical' | 'High' | 'Medium' | 'Low'>('All')
@@ -70,17 +91,74 @@ export default function ReportsPage() {
   const [shareModalOpen, setShareModalOpen] = useState(false)
   const [fixToastMsg, setFixToastMsg] = useState<string | null>(null)
 
-  // Report Metadata
-  const reportMeta = {
-    name: 'Enterprise Executive SEO & Content Audit',
-    projectName: `${activeDomainName} Production Workspace`,
-    keyword: 'Payment Gateway Security API',
-    generatedDate: new Date().toLocaleString(),
-    analysisDuration: '3.4 seconds',
-    overallGrade: 'A+',
-    overallScore: 94,
-    predictedRank: '#2 (Top 3 Guarantee)',
+  // Load Report Repository from storage
+  const loadRepository = () => {
+    const reports = getReportsFromStorage()
+    setRepository(reports)
   }
+
+  useEffect(() => {
+    loadRepository()
+  }, [])
+
+  // ── Real analysis data from localStorage (fallback or current run) ──
+  const [lastAnalysis, setLastAnalysis] = useState<any | null>(null)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('qontint_last_analysis')
+      if (raw) setLastAnalysis(JSON.parse(raw))
+    } catch (_) {}
+  }, [])
+
+  // Selected Active Report Payload (or fallback to lastAnalysis)
+  const activeReport = useMemo(() => {
+    if (selectedReportId) {
+      const found = repository.find(r => r.id === selectedReportId)
+      if (found) return found
+    }
+    return null
+  }, [selectedReportId, repository])
+
+  const reportPayload = activeReport?.payload?.result || lastAnalysis?.result
+  const reportMeta = {
+    name: activeReport?.title || 'Enterprise Executive SEO & Content Audit',
+    projectName: `${activeDomainName} Production Workspace`,
+    keyword: activeReport?.keyword || lastAnalysis?.keyword || '—',
+    generatedDate: activeReport?.createdAt ? new Date(activeReport.createdAt).toLocaleString() : lastAnalysis?.analyzedAt ? new Date(lastAnalysis.analyzedAt).toLocaleString() : new Date().toLocaleString(),
+    analysisDuration: lastAnalysis?.raw?.processing_time_ms ? `${(lastAnalysis.raw.processing_time_ms / 1000).toFixed(1)}s` : '1.2s',
+    overallGrade: (activeReport?.score || lastAnalysis?.result?.seoScore || 0) >= 90 ? 'A+' : (activeReport?.score || lastAnalysis?.result?.seoScore || 0) >= 80 ? 'A' : (activeReport?.score || lastAnalysis?.result?.seoScore || 0) >= 70 ? 'B' : 'C',
+    overallScore: activeReport?.score || lastAnalysis?.result?.seoScore || 0,
+    predictedRank: activeReport?.rank || (lastAnalysis?.result?.predicted_rank ? `#${lastAnalysis.result.predicted_rank}` : '#3'),
+  }
+
+  // Visual Performance Analytics Data (Section 8)
+  const scoreBreakdownData = useMemo(() => {
+    const seoScore = reportMeta.overallScore || 85
+    const authorityScore = Math.round((reportPayload?.authority?.authority_score || 0.84) * 100)
+    const coverageScore = Math.round((reportPayload?.authority?.authority_score || 0.88) * 100)
+    const noveltyScore = Math.round((reportPayload?.novelty?.novelty_score || 0.44) * 100)
+    const semanticScore = Math.round((reportPayload?.novelty?.semantic_diversity || 0.88) * 100)
+
+    return [
+      { subject: 'SEO Score', A: seoScore, fullMark: 100 },
+      { subject: 'Authority', A: authorityScore, fullMark: 100 },
+      { subject: 'Coverage', A: coverageScore, fullMark: 100 },
+      { subject: 'Readability', A: 88, fullMark: 100 },
+      { subject: 'Originality', A: noveltyScore, fullMark: 100 },
+      { subject: 'Semantic', A: semanticScore, fullMark: 100 },
+    ]
+  }, [reportMeta, reportPayload])
+
+  const entityDistributionData = useMemo(() => {
+    return [
+      { name: 'Technology', value: 35 },
+      { name: 'Standard', value: 25 },
+      { name: 'Product', value: 20 },
+      { name: 'Concept', value: 12 },
+      { name: 'Process', value: 8 },
+    ]
+  }, [])
 
   // Top 5 Action Recommendations (Section 2)
   const topActionPlan: ActionRecommendation[] = [
@@ -136,17 +214,17 @@ export default function ReportsPage() {
     }
   ]
 
-  // KPI Performance Data (Section 3)
-  const performanceKPIs = [
-    { label: 'Overall SEO Score', score: '94%', status: 'Excellent', trend: '+6%', color: 'text-[var(--aurora)]', desc: 'Top 5% across domain' },
-    { label: 'Predicted Rank', score: '#2', status: 'Top 3 Target', trend: '+4 Pos', color: 'text-emerald-600', desc: 'Outranks 8/10 competitors' },
-    { label: 'Authority Score', score: '88%', status: 'Strong', trend: '+12%', color: 'text-blue-600', desc: 'High entity density' },
-    { label: 'Novelty Score', score: '85%', status: 'High Originality', trend: '+5%', color: 'text-purple-600', desc: 'Unique perspectives' },
-    { label: 'Semantic Coverage', score: '92%', status: 'Optimal', trend: '+8%', color: 'text-teal-600', desc: 'Covers core subtopics' },
-    { label: 'Content Quality', score: '91%', status: 'Grade A', trend: '+4%', color: 'text-[var(--aurora)]', desc: 'Clear H2/H3 hierarchy' },
-    { label: 'CTR Prediction', score: '+34%', status: 'High Clickability', trend: '+15%', color: 'text-emerald-600', desc: 'Rich Snippet eligible' },
-    { label: 'Readability Grade', score: 'Grade 11', status: 'Advanced B2B', trend: 'Stable', color: 'text-blue-600', desc: 'Targeted at CTOs' }
-  ]
+  // KPI Performance Data derived from real analysis (Section 3)
+  const performanceKPIs = lastAnalysis ? [
+    { label: 'Overall SEO Score', score: lastAnalysis.result?.seoScore ? `${lastAnalysis.result.seoScore}%` : '—', status: lastAnalysis.result?.seoScore >= 90 ? 'Excellent' : 'Good', trend: '', color: 'text-[var(--aurora)]', desc: `Keyword: ${lastAnalysis.keyword}` },
+    { label: 'Predicted Rank', score: lastAnalysis.result?.predicted_rank ? `#${lastAnalysis.result.predicted_rank}` : '—', status: lastAnalysis.result?.predicted_rank <= 3 ? 'Top 3 Target' : 'Ranking', trend: '', color: 'text-emerald-600', desc: 'From ML ranking model' },
+    { label: 'Novelty Score', score: lastAnalysis.result?.novelty_score != null ? `${Math.round(lastAnalysis.result.novelty_score * 100)}%` : '—', status: lastAnalysis.result?.novelty_score >= 0.35 ? 'Above Threshold' : 'Below Threshold', trend: '', color: 'text-purple-600', desc: 'Semantic uniqueness' },
+    { label: 'Entities Found', score: `${lastAnalysis.result?.entities?.length || 0}`, status: 'Extracted', trend: '', color: 'text-blue-600', desc: 'Via spaCy NLP pipeline' },
+    { label: 'Authority Score', score: lastAnalysis.result?.authorityScore ? `${Math.round(lastAnalysis.result.authorityScore * 100)}%` : '—', status: 'Computed', trend: '', color: 'text-teal-600', desc: 'Entity co-occurrence graph' },
+    { label: 'Entity Coverage', score: lastAnalysis.raw?.entity_coverage != null ? `${Math.round(lastAnalysis.raw.entity_coverage * 100)}%` : '—', status: 'NLP Measured', trend: '', color: 'text-[var(--aurora)]', desc: 'Relative to corpus' },
+    { label: 'Vertical', score: lastAnalysis.vertical || '—', status: 'Workspace', trend: '', color: 'text-emerald-600', desc: 'Analysis context' },
+    { label: 'Content Grade', score: reportMeta.overallGrade, status: 'Computed', trend: '', color: 'text-blue-600', desc: 'From SEO score thresholds' }
+  ] : []
 
   // Content Quality Breakdown (Section 5)
   const qualityBreakdown = [
@@ -171,37 +249,48 @@ export default function ReportsPage() {
     { name: 'PayPal API Portal', position: '#4', authority: '82%', coverage: '78%', entities: 31, wordCount: 1600, gap: '+14%', status: 'Trailing' },
   ]
 
-  // Chart Data (Section 8)
-  const scoreBreakdownData = [
-    { subject: 'SEO Score', A: 94, fullMark: 100 },
-    { subject: 'Authority', A: 88, fullMark: 100 },
-    { subject: 'Coverage', A: 92, fullMark: 100 },
-    { subject: 'Readability', A: 88, fullMark: 100 },
-    { subject: 'Schema', A: 78, fullMark: 100 },
-    { subject: 'Originality', A: 92, fullMark: 100 },
-  ]
+  // Filtered & Sorted Repository List
+  const filteredRepository = useMemo(() => {
+    return repository.filter(r => {
+      const matchesSearch = !searchQuery.trim() ||
+        r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.keyword.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.domain.toLowerCase().includes(searchQuery.toLowerCase())
 
-  const entityDistributionData = [
-    { name: 'Technology', value: 35 },
-    { name: 'Standard', value: 25 },
-    { name: 'Product', value: 20 },
-    { name: 'Concept', value: 12 },
-    { name: 'Process', value: 8 },
-  ]
+      if (activeCategoryTab === 'Favorites') return matchesSearch && r.isFavorite && !r.isArchived
+      if (activeCategoryTab === 'Archived') return matchesSearch && r.isArchived
+      if (activeCategoryTab !== 'All') return matchesSearch && r.type === activeCategoryTab && !r.isArchived
 
-  // Historical Reports (Section 10)
-  const [reportHistory, setReportHistory] = useState<HistoricalReport[]>([
-    { id: 'rep-1', title: 'Qontint Executive Audit - Q3', keyword: 'Payment Gateway Security API', date: '2026-07-25', score: 94, grade: 'A+', status: 'Completed' },
-    { id: 'rep-2', title: 'Stripe Competitor Benchmark', keyword: 'PCI DSS 4.0 Integration', date: '2026-07-20', score: 88, grade: 'A', status: 'Completed' },
-    { id: 'rep-3', title: 'OAuth 2.0 Content Strategy', keyword: 'B2B Authentication API', date: '2026-07-15', score: 82, grade: 'B+', status: 'Archived' },
-  ])
+      return matchesSearch && !r.isArchived
+    }).sort((a, b) => {
+      if (sortBy === 'Newest') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      if (sortBy === 'Oldest') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      if (sortBy === 'Score') return (b.score || 0) - (a.score || 0)
+      if (sortBy === 'Alphabetical') return a.title.localeCompare(b.title)
+      return 0
+    })
+  }, [repository, activeCategoryTab, searchQuery, sortBy])
+
+  const repositoryStats = useMemo(() => {
+    return {
+      total: repository.length,
+      analyze: repository.filter(r => r.type === 'Analyze').length,
+      generate: repository.filter(r => r.type === 'Generated Content').length,
+      serp: repository.filter(r => r.type === 'SERP Intelligence').length,
+      graph: repository.filter(r => r.type === 'Knowledge Graph').length,
+      favorites: repository.filter(r => r.isFavorite).length,
+      archived: repository.filter(r => r.isArchived).length
+    }
+  }, [repository])
 
   const filteredHistory = useMemo(() => {
-    return reportHistory.filter(r =>
+    return repository.filter(r =>
+      !historySearch.trim() ||
       r.title.toLowerCase().includes(historySearch.toLowerCase()) ||
       r.keyword.toLowerCase().includes(historySearch.toLowerCase())
     )
-  }, [reportHistory, historySearch])
+  }, [repository, historySearch])
 
   const triggerFixNow = (recTitle: string) => {
     setFixToastMsg(`Fixing "${recTitle}"... Recommendation applied to AI Content Studio!`)
@@ -214,8 +303,241 @@ export default function ReportsPage() {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `Executive_Report_${reportMeta.keyword.replace(/\s+/g, '_')}.${format.toLowerCase()}`
+    link.download = `Executive_Report_${(reportMeta.keyword || 'report').replace(/\s+/g, '_')}.${format.toLowerCase()}`
     link.click()
+  }
+
+  // If no report is selected and repository has items or is empty, show Repository View
+  const renderRepositoryHub = () => (
+    <div className="min-h-screen flex flex-col pt-14 pb-20 px-4 max-w-[1600px] mx-auto space-y-6 relative bg-[var(--bg-void)]">
+      {/* Repository Title & Stats Cards Header */}
+      <div className="card p-6 border border-[var(--border-subtle)] bg-[var(--bg-card)] space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-[var(--aurora)]/10 text-[var(--aurora)] border border-[var(--aurora)]/20 flex items-center justify-center">
+              <FileText className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="font-display font-bold text-[var(--text-primary)] text-2xl">
+                  Enterprise Report Repository
+                </h1>
+                <span className="px-3 py-1 rounded-full text-xs font-bold font-mono bg-[var(--aurora)]/10 text-[var(--aurora)] border border-[var(--aurora)]/20 uppercase">
+                  {repositoryStats.total} Reports Stored
+                </span>
+              </div>
+              <p className="text-xs text-[var(--text-muted)] mt-1 font-mono">
+                Permanent, non-overwriting repository for all Analyze, Generation, SERP, and Graph reports
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/app/analyze')}
+              className="btn-primary px-4 py-2 text-xs font-bold flex items-center gap-2"
+            >
+              <Cpu size={14} /> New Content Analysis
+            </button>
+            <button
+              onClick={() => navigate('/app/generate')}
+              className="btn-secondary px-4 py-2 text-xs font-bold flex items-center gap-2"
+            >
+              <Zap size={14} /> New Content Studio
+            </button>
+          </div>
+        </div>
+
+        {/* 6 Repository KPI Metrics Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-2">
+          <div className="p-3.5 bg-[var(--bg-depth)] rounded-xl border border-[var(--border-subtle)]">
+            <span className="text-[10px] font-mono text-[var(--text-muted)] uppercase block">Total Reports</span>
+            <span className="text-xl font-bold font-mono text-[var(--text-primary)]">{repositoryStats.total}</span>
+          </div>
+          <div className="p-3.5 bg-[var(--bg-depth)] rounded-xl border border-[var(--border-subtle)]">
+            <span className="text-[10px] font-mono text-[var(--text-muted)] uppercase block">Analyze Audits</span>
+            <span className="text-xl font-bold font-mono text-[var(--aurora)]">{repositoryStats.analyze}</span>
+          </div>
+          <div className="p-3.5 bg-[var(--bg-depth)] rounded-xl border border-[var(--border-subtle)]">
+            <span className="text-[10px] font-mono text-[var(--text-muted)] uppercase block">Generated Content</span>
+            <span className="text-xl font-bold font-mono text-emerald-600">{repositoryStats.generate}</span>
+          </div>
+          <div className="p-3.5 bg-[var(--bg-depth)] rounded-xl border border-[var(--border-subtle)]">
+            <span className="text-[10px] font-mono text-[var(--text-muted)] uppercase block">SERP Audits</span>
+            <span className="text-xl font-bold font-mono text-blue-600">{repositoryStats.serp}</span>
+          </div>
+          <div className="p-3.5 bg-[var(--bg-depth)] rounded-xl border border-[var(--border-subtle)]">
+            <span className="text-[10px] font-mono text-[var(--text-muted)] uppercase block">Graph Snapshots</span>
+            <span className="text-xl font-bold font-mono text-purple-600">{repositoryStats.graph}</span>
+          </div>
+          <div className="p-3.5 bg-[var(--bg-depth)] rounded-xl border border-[var(--border-subtle)]">
+            <span className="text-[10px] font-mono text-[var(--text-muted)] uppercase block">Favorites / Archived</span>
+            <span className="text-xl font-bold font-mono text-amber-600">{repositoryStats.favorites} / {repositoryStats.archived}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Category Tabs & Search Toolbar */}
+      <div className="card p-4 border border-[var(--border-subtle)] bg-[var(--bg-card)] space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          {/* Category Switcher Tabs */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            {['All', 'Analyze', 'Generated Content', 'SERP Intelligence', 'Knowledge Graph', 'Favorites', 'Archived'].map(cat => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategoryTab(cat)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold font-mono transition-all whitespace-nowrap ${
+                  activeCategoryTab === cat
+                    ? 'bg-[var(--aurora)] text-white shadow-xs'
+                    : 'bg-[var(--bg-depth)] text-[var(--text-secondary)] border border-[var(--border-subtle)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {/* Search & Sort Controls */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-[var(--text-muted)]" />
+              <input
+                type="text"
+                placeholder="Search reports..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="pl-9 pr-4 py-2 text-xs bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] focus:border-[var(--aurora)] transition-all w-60"
+              />
+            </div>
+
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as any)}
+              className="px-3 py-2 text-xs bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] focus:border-[var(--aurora)] font-mono"
+            >
+              <option value="Newest">Newest First</option>
+              <option value="Oldest">Oldest First</option>
+              <option value="Score">Highest Score</option>
+              <option value="Alphabetical">Alphabetical</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Reports Repository List / Table */}
+      {filteredRepository.length === 0 ? (
+        <div className="card p-12 border border-[var(--border-subtle)] bg-[var(--bg-card)] text-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-[var(--aurora)]/10 text-[var(--aurora)] border border-[var(--aurora)]/20 flex items-center justify-center mx-auto">
+            <FileText className="w-6 h-6" />
+          </div>
+          <h3 className="font-bold text-lg text-[var(--text-primary)]">No Reports Found in Repository</h3>
+          <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto font-mono">
+            {searchQuery
+              ? `No reports match search "${searchQuery}". Try clearing search filters.`
+              : 'Perform content analysis, generation, SERP audits, or graph snapshots to automatically build your persistent report repository.'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filteredRepository.map(report => (
+            <div
+              key={report.id}
+              className="card p-5 border border-[var(--border-subtle)] bg-[var(--bg-card)] hover:border-[var(--aurora)]/50 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 group"
+            >
+              <div className="flex items-start gap-4 flex-1">
+                <div className="w-10 h-10 rounded-xl bg-[var(--bg-depth)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--aurora)] flex-shrink-0">
+                  {report.type === 'Analyze' && <Cpu size={20} />}
+                  {report.type === 'Generated Content' && <Zap size={20} />}
+                  {report.type === 'SERP Intelligence' && <Globe size={20} />}
+                  {report.type === 'Knowledge Graph' && <Network size={20} />}
+                  {report.type === 'Workspace' && <FileText size={20} />}
+                </div>
+
+                <div className="space-y-1 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-bold text-base text-[var(--text-primary)] group-hover:text-[var(--aurora)] transition-colors">
+                      {report.title}
+                    </h3>
+                    <span className="px-2.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-[var(--aurora)]/10 text-[var(--aurora)] border border-[var(--aurora)]/20">
+                      {report.type}
+                    </span>
+                    {report.isFavorite && (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 text-amber-600 border border-amber-500/20 flex items-center gap-1">
+                        <Star size={10} className="fill-amber-500 text-amber-500" /> Favorite
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-[var(--text-muted)] font-mono flex items-center gap-3 flex-wrap">
+                    <span>Keyword: <strong className="text-[var(--text-primary)]">{report.keyword}</strong></span>
+                    <span>Domain: <strong>{report.domain}</strong></span>
+                    <span>Created: <strong>{new Date(report.createdAt).toLocaleString()}</strong></span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Score Badge & Action Launcher Controls */}
+              <div className="flex items-center gap-3 flex-shrink-0 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-3 md:pt-0 border-[var(--border-subtle)]">
+                <div className="text-right pr-2">
+                  <span className="text-lg font-bold font-mono text-[var(--aurora)]">{report.score}%</span>
+                  <span className="text-[10px] font-mono text-[var(--text-muted)] block">Grade {report.grade} ({report.rank})</span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setSelectedReportId(report.id)}
+                    className="btn-primary px-3.5 py-2 text-xs font-bold flex items-center gap-1.5"
+                  >
+                    <Eye size={14} /> View Report
+                  </button>
+
+                  <button
+                    onClick={() => navigate(report.originalRoute)}
+                    className="btn-secondary px-3 py-2 text-xs flex items-center gap-1.5 font-bold"
+                    title="Open Original Module"
+                  >
+                    <ExternalLink size={14} />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      toggleFavoriteReport(report.id)
+                      loadRepository()
+                    }}
+                    className={`p-2 rounded-xl border transition-colors ${
+                      report.isFavorite
+                        ? 'bg-amber-500/10 border-amber-500/30 text-amber-500'
+                        : 'bg-[var(--bg-depth)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-amber-500'
+                    }`}
+                    title="Toggle Favorite"
+                  >
+                    <Star size={14} className={report.isFavorite ? 'fill-amber-500' : ''} />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (confirm(`Delete report "${report.title}" from repository?`)) {
+                        deleteReportFromRepository(report.id)
+                        loadRepository()
+                      }
+                    }}
+                    className="p-2 rounded-xl bg-[var(--bg-depth)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-red-500 hover:border-red-500/30 transition-colors"
+                    title="Delete Report"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
+  // If no report selected, render Repository Hub View
+  if (!selectedReportId) {
+    return renderRepositoryHub()
   }
 
   return (
@@ -259,6 +581,12 @@ export default function ReportsPage() {
 
           {/* Action Export Buttons */}
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setSelectedReportId(null)}
+              className="btn-primary px-3.5 py-2 text-xs flex items-center gap-1.5 font-bold"
+            >
+              ← Back to Report Repository
+            </button>
             <button onClick={() => exportReport('PDF')} className="btn-secondary px-3 py-2 text-xs flex items-center gap-1.5">
               <Download size={14} /> PDF
             </button>

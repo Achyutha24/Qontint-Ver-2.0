@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Search, Download, CheckCircle, AlertTriangle, Lightbulb, BarChart2, MessageSquare, Box, Rocket, Info, ChevronRight } from 'lucide-react'
 import CinematicLoader from './CinematicLoader'
+import ScoreCard from './ScoreCard'
 import type { AnalyzeResult } from './ResultsPanel'
 
 interface Props {
@@ -47,53 +48,7 @@ function fmt2(val: number): string {
   return parseFloat(val.toFixed(2)).toString()
 }
 
-// ── Sub-components ───────────────────────────────────────────────────────────
 
-function ScoreDial({
-  value,
-  color,
-  label,
-  subtext,
-}: {
-  value: number
-  color: string
-  label: string
-  subtext: string
-}) {
-  const r = 20
-  const circ = 2 * Math.PI * r
-  const pct = Math.max(0, Math.min(100, value))
-  const offset = circ - (pct / 100) * circ
-  return (
-    <div className="bg-[var(--bg-depth)] border border-[var(--border-subtle)] p-4 rounded-xl flex items-center gap-4 flex-1 min-w-[140px]">
-      <div className="relative w-12 h-12 flex-shrink-0">
-        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 48 48">
-          <circle cx="24" cy="24" r={r} fill="none" stroke="currentColor" strokeWidth="4" className="text-[var(--border-subtle)] opacity-30" />
-          <circle
-            cx="24" cy="24" r={r} fill="none" stroke={color} strokeWidth="4"
-            strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
-            className="transition-all duration-1000 ease-out"
-          />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-sm font-bold text-[var(--text-primary)]">{pct}</span>
-        </div>
-      </div>
-      <div className="flex flex-col">
-        <div className="flex items-center gap-1.5 mb-0.5">
-          <span className="w-4 h-4 rounded bg-[var(--bg-void)] border border-[var(--border-subtle)] flex items-center justify-center">
-            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
-          </span>
-          <span className="text-[10px] text-[var(--text-muted)] font-mono uppercase tracking-widest">{label}</span>
-        </div>
-        <span className="text-xs font-semibold" style={{ color }}>
-          {pct}<span className="text-[10px] opacity-70 ml-0.5">/100</span>
-        </span>
-        <span className="text-[10px] mt-0.5" style={{ color }}>{subtext}</span>
-      </div>
-    </div>
-  )
-}
 
 function StatMini({ value, label }: { value: string | number; label: string }) {
   return (
@@ -179,16 +134,6 @@ export default function CompetitorComparisonModal({
     intentMatch * 0.10 +
     readScore * 0.10
   )))
-
-  // Color & rating helpers
-  const getColor = (val: number) =>
-    val >= 90 ? 'var(--aurora)' :
-    val >= 80 ? 'var(--stellar)' :
-    val >= 70 ? 'var(--plasma)' :
-    'var(--solar)'
-
-  const getRating = (val: number) =>
-    val >= 90 ? 'Excellent' : val >= 80 ? 'Very Good' : val >= 70 ? 'Good' : 'Needs Optimization'
 
   // AI Summary
   const aiSummary =
@@ -318,21 +263,21 @@ export default function CompetitorComparisonModal({
                 className="max-w-[1400px] mx-auto p-6 space-y-6"
               >
 
-                {/* ── Score Row ───────────────────────────────────────────── */}
-                <div className="flex flex-wrap gap-4">
+                {/* ── Score Section ───────────────────────────────────────────── */}
+                <div className="flex flex-col lg:flex-row gap-5 items-stretch">
                   {/* Keyword card */}
-                  <div className="flex flex-col justify-center min-w-[200px] bg-[var(--bg-depth)] border border-[var(--border-subtle)] p-4 rounded-xl flex-shrink-0">
+                  <div className="flex flex-col justify-center w-full lg:w-[220px] bg-[var(--bg-depth)] border border-[var(--border-subtle)] p-5 rounded-2xl flex-shrink-0">
                     <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest font-mono mb-1">Keyword Analyzed</span>
-                    <h2 className="text-2xl font-bold text-[var(--aurora)] truncate max-w-[250px]">{keyword}</h2>
+                    <h2 className="text-xl font-bold text-[var(--aurora)] line-clamp-3 leading-snug">{keyword}</h2>
                   </div>
-                  {/* Score dials */}
-                  <div className="flex flex-1 gap-4 overflow-x-auto pb-2 custom-scroll">
-                    <ScoreDial value={overallScore}  color={getColor(overallScore)}  label="Overall Score"      subtext={getRating(overallScore)} />
-                    <ScoreDial value={seoScore}       color={getColor(seoScore)}       label="SEO Score"         subtext={getRating(seoScore)} />
-                    <ScoreDial value={readScore}      color={getColor(readScore)}      label="Readability"       subtext={readabilityText} />
-                    <ScoreDial value={noveltyScore}   color={getColor(noveltyScore)}   label="Novelty Score"     subtext={getRating(noveltyScore)} />
-                    <ScoreDial value={semCoverage}    color={getColor(semCoverage)}    label="Semantic Coverage" subtext={getRating(semCoverage)} />
-                    <ScoreDial value={intentMatch}    color={getColor(intentMatch)}    label="Intent Match"      subtext={getRating(intentMatch)} />
+                  {/* Responsive Enterprise KPI Grid: 1 col mobile, 2 tablet, 3 laptop/desktop */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-4 flex-1 w-full">
+                    <ScoreCard score={overallScore} metricKey="overall" />
+                    <ScoreCard score={seoScore} metricKey="seo" />
+                    <ScoreCard score={readScore} metricKey="readability" customSubtext={readabilityText} />
+                    <ScoreCard score={noveltyScore} metricKey="novelty" />
+                    <ScoreCard score={semCoverage} metricKey="semantic" />
+                    <ScoreCard score={intentMatch} metricKey="intent" />
                   </div>
                 </div>
 

@@ -76,49 +76,59 @@ def _extract_domain(url: str) -> str:
 
 def _safe_json_loads(raw: str) -> Optional[dict]:
     """
-    Triple-pass JSON repair:
-      1. Strict json.loads
-      2. Regex extraction of JSON block + strict parse
-      3. ast.literal_eval fallback
-    Returns None only if all three fail.
+    Multi-pass robust JSON parser:
+      1. Strip markdown fences and leading/trailing text
+      2. Direct json.loads with strict=False
+      3. Outermost brace extraction { ... } + strict=False
+      4. Trailing comma repair + strict=False
+      5. ast.literal_eval fallback
+    Returns None only if all passes fail.
     """
     if not raw or not raw.strip():
         return None
 
     cleaned = raw.strip()
 
-    # Strip markdown code fences
-    for fence in ("```json", "```"):
-        if cleaned.startswith(fence):
-            cleaned = cleaned[len(fence):]
-    if cleaned.endswith("```"):
-        cleaned = cleaned[:-3]
-    cleaned = cleaned.strip()
+    # Strip markdown code blocks even if preceded by intro text
+    if "```" in cleaned:
+        code_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', cleaned, re.IGNORECASE)
+        if code_match:
+            cleaned = code_match.group(1).strip()
 
-    # Pass 1: Strict
+    # Pass 1: Direct json.loads with strict=False (allows unescaped control chars/newlines in strings)
     try:
-        result = json.loads(cleaned)
+        result = json.loads(cleaned, strict=False)
         if isinstance(result, dict):
             return result
-    except json.JSONDecodeError:
+    except Exception:
         pass
 
-    # Pass 2: Regex extract JSON block
-    match = re.search(r'\{.*\}', cleaned, re.DOTALL)
-    if match:
+    # Pass 2: Extract outermost JSON object { ... }
+    start_idx = cleaned.find('{')
+    end_idx = cleaned.rfind('}')
+    if start_idx != -1 and end_idx > start_idx:
+        json_str = cleaned[start_idx:end_idx + 1]
         try:
-            result = json.loads(match.group(0))
+            result = json.loads(json_str, strict=False)
             if isinstance(result, dict):
                 return result
-        except json.JSONDecodeError:
+        except Exception:
             pass
 
-    # Pass 3: ast.literal_eval (handles Python-style booleans)
-    if match:
+        # Pass 3: Repair trailing commas before closing braces/brackets
+        fixed_commas = re.sub(r',\s*([}\]])', r'\1', json_str)
         try:
-            py_str = re.sub(r'\btrue\b', 'True', match.group(0))
-            py_str = re.sub(r'\bfalse\b', 'False', py_str)
-            py_str = re.sub(r'\bnull\b', 'None', py_str)
+            result = json.loads(fixed_commas, strict=False)
+            if isinstance(result, dict):
+                return result
+        except Exception:
+            pass
+
+        # Pass 4: ast.literal_eval fallback (handles Python dict syntax / True / False / None)
+        try:
+            py_str = re.sub(r'\btrue\b', 'True', fixed_commas, flags=re.IGNORECASE)
+            py_str = re.sub(r'\bfalse\b', 'False', py_str, flags=re.IGNORECASE)
+            py_str = re.sub(r'\bnull\b', 'None', py_str, flags=re.IGNORECASE)
             result = ast.literal_eval(py_str)
             if isinstance(result, dict):
                 return result
@@ -597,11 +607,22 @@ async def _run_pipeline(
                 else:
                     plog.increment_retry()
                     # On retry: attempt to repair the previously malformed output
-                    repair_prompt = (
-                        f"The following text was supposed to be a JSON object but is malformed. "
-                        f"Repair it and return ONLY valid JSON with keys: "
-                        f"executive_summary, knowledge_synthesis, recommendations.\n\n{raw_text}"
-                    )
+                    repair_prompt = f"""The following text was supposed to be a JSON object but is malformed.
+Repair it and return ONLY valid JSON matching this exact structure:
+
+{{
+  "executive_summary": "<300-500 word synthesis>",
+  "knowledge_synthesis": {{
+    "unified_understanding": "<how SERP addresses user intent>",
+    "key_insights": ["<insight 1>", "<insight 2>"],
+    "best_concepts": ["<concept 1>", "<concept 2>"],
+    "actionable_opportunities": ["<opportunity 1>", "<opportunity 2>"]
+  }},
+  "recommendations": ["<recommendation 1>", "<recommendation 2>"]
+}}
+
+Malformed text to repair:
+{raw_text}"""
                     prompt = repair_prompt
 
                 plog.info(Stage.AI_RUNNING, f"Gemini call attempt {attempt + 1}", provider="Gemini")

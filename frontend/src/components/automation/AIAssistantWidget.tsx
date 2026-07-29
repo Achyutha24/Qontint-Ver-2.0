@@ -96,11 +96,37 @@ export default function AIAssistantWidget() {
     return ['Summarize Workspace', 'Show Key Recommendations']
   }, [location.pathname])
 
-  // Context Bar Data (Grounding Check)
-  const activeKeyword = 'Payment Gateway Security API'
-  const hasAnalysisData = true // Live platform state indicator
-  const lastAnalysisTime = '25 Jul 2026 19:10'
-  const currentHealth = 'Excellent (Grade A+)'
+  // ── Real context from localStorage (set by AnalyzePage) ───────────────────────
+  const [lastAnalysis, setLastAnalysis] = useState<any | null>(null)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('qontint_last_analysis')
+      if (raw) setLastAnalysis(JSON.parse(raw))
+    } catch (_) {}
+    // Also listen for storage changes from other tabs
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'qontint_last_analysis' && e.newValue) {
+        try { setLastAnalysis(JSON.parse(e.newValue)) } catch (_) {}
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
+  // Derive real context values for the current active workspace
+  const lastAnalysisVertical = lastAnalysis?.vertical
+  const isMatchingWorkspace = !lastAnalysisVertical ||
+    lastAnalysisVertical.toLowerCase() === verticalFilter.toLowerCase() ||
+    lastAnalysisVertical.toLowerCase() === 'general'
+
+  const hasAnalysisData = !!lastAnalysis
+  const hasAnalysisForCurrentWorkspace = hasAnalysisData && isMatchingWorkspace
+  const activeKeyword = hasAnalysisForCurrentWorkspace ? (lastAnalysis?.keyword || null) : null
+  const lastAnalysisTime = hasAnalysisForCurrentWorkspace && lastAnalysis?.analyzedAt ? new Date(lastAnalysis.analyzedAt).toLocaleString() : null
+  const currentHealth = hasAnalysisForCurrentWorkspace && lastAnalysis?.result?.seoScore != null
+    ? lastAnalysis.result.seoScore >= 90 ? 'Excellent (Grade A+)' : lastAnalysis.result.seoScore >= 80 ? 'Good (Grade A)' : 'Fair (Grade B)'
+    : null
 
   // Conversation Messages
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -113,14 +139,14 @@ export default function AIAssistantWidget() {
     const greetingMessage: ChatMessage = {
       id: 'greeting-1',
       sender: 'ai',
-      text: `${greetingTime}! I am your ${copilotTitle} for ${activeDomainName}.\n\nActive Context: "${activeKeyword}" on ${pageLabel}.\nProject Health: ${currentHealth}.\n\nHow can I assist your campaign today?`,
+      text: hasAnalysisForCurrentWorkspace && activeKeyword
+        ? `${greetingTime}! I am your ${copilotTitle} for ${activeDomainName}.\n\nActive Context: "${activeKeyword}" analyzed on ${lastAnalysisTime}.\nContent Health: ${currentHealth}.\n\nHow can I assist your campaign today?`
+        : `${greetingTime}! I am your ${copilotTitle} for ${activeDomainName}.\n\nNo analysis has been completed for the current workspace.\n\nRun a content analysis on the Analyze page to unlock full AI assistance for ${activeDomainName}.`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
 
-    if (messages.length === 0) {
-      setMessages([greetingMessage])
-    }
-  }, [copilotTitle, activeDomainName, pageLabel])
+    setMessages([greetingMessage])
+  }, [copilotTitle, activeDomainName, pageLabel, hasAnalysisForCurrentWorkspace, activeKeyword])
 
   const chatEndRef = useRef<HTMLDivElement>(null)
 
@@ -168,45 +194,75 @@ export default function AIAssistantWidget() {
     }, 350)
   }
 
-  // Zero-Hallucination Response Logic Grounded in Platform Data
+  // Zero-Hallucination Response Logic Grounded in Real Platform Data
   const generateHonestResponse = (query: string) => {
     const q = query.toLowerCase()
     let responseText = ''
     let actionBtn: ActionButton | undefined
     let richDataObj: any | undefined
 
-    if (q.includes('explain seo score') || q.includes('score')) {
-      responseText = `The SEO Score for "${activeKeyword}" is 94/100 (Grade A+). It is calculated from 96% heading structure, 92% semantic coverage, 88% authority density, and 85% novelty score.`
-      actionBtn = { label: 'Open Executive Report', route: '/app/reports' }
-      richDataObj = { score: 94, rank: '#2', health: 'Grade A+' }
-    } else if (q.includes('improve') || q.includes('fix') || q.includes('attention')) {
-      responseText = `Highest Priority Fix: Add a dedicated PCI DSS 4.0 compliance entity section to capture Position #1 from Stripe (+2.4 positions rank improvement estimated).`
-      actionBtn = { label: 'Fix in AI Content Studio', route: '/app/generate' }
-      richDataObj = {
-        recommendations: [
-          'Add PCI DSS 4.0 entity cluster (+2.4 Pos)',
-          'Implement structured FAQPage JSON-LD schema (+1.8 Pos)',
-          'Add 3 internal links to security endpoints (+1.1 Pos)'
-        ]
+    // If no analysis has been completed for the current workspace, respond honestly without fabricating data
+    if (!hasAnalysisForCurrentWorkspace) {
+      if (q.includes('score') || q.includes('rank') || q.includes('seo') || q.includes('entity') ||
+          q.includes('competitor') || q.includes('novelty') || q.includes('authority') ||
+          q.includes('graph') || q.includes('workspace') || q.includes('project') || q.includes('summarize')) {
+        responseText = `No analysis has been completed for the current workspace.`
+        actionBtn = { label: 'Run First Analysis', route: '/app/analyze' }
+      } else if (q.includes('generate') || q.includes('write') || q.includes('content')) {
+        responseText = `No analysis has been completed for the current workspace.\n\nYou can head to the AI Content Studio to generate content for ${activeDomainName}.`
+        actionBtn = { label: 'Open AI Content Studio', route: '/app/generate' }
+      } else if (q.includes('keyword')) {
+        responseText = `Browse keywords for ${activeDomainName} in the Keywords Explorer.`
+        actionBtn = { label: 'Open Keywords Explorer', route: '/app/keywords' }
+      } else {
+        responseText = `No analysis has been completed for the current workspace.`
+        actionBtn = { label: 'Run First Analysis', route: '/app/analyze' }
       }
-    } else if (q.includes('readability')) {
-      responseText = `Readability Score is Grade 11 (Advanced B2B). Sentences are well-structured for CTOs and Security Engineers. We recommend shortening 2 paragraphs in section 3.`
-      actionBtn = { label: 'Open AI Content Studio', route: '/app/generate' }
-    } else if (q.includes('faq') || q.includes('schema')) {
-      responseText = `FAQ Schema is currently missing. Adding structured FAQPage JSON-LD markup will make your document eligible for Position 0 Rich Snippets (+28% CTR boost).`
-      actionBtn = { label: 'Generate FAQ Schema', route: '/app/generate' }
-    } else if (q.includes('competitor') || q.includes('ranks') || q.includes('stripe')) {
-      responseText = `Stripe ranks #1 with 94% authority because their documentation includes explicit PCI DSS 4.0 idempotency compliance sections. Adding these entities will bridge the gap.`
-      actionBtn = { label: 'View SERP Intelligence', route: '/app/serp-intel' }
-    } else if (q.includes('entity') || q.includes('graph') || q.includes('concept')) {
-      responseText = `Knowledge Graph shows 199 indexed nodes and 5,488 relationships. Most connected entity: "Payment Gateway API" (27.6 links/node). Missing entity cluster: "PCI DSS Compliance".`
-      actionBtn = { label: 'Inspect Knowledge Graph', route: '/app/graph' }
-    } else if (q.includes('summarize project') || q.includes('workspace')) {
-      responseText = `Workspace "${activeDomainName}" contains 8 active projects. Top performing project: Payment Gateway Security (94/100). Project needing attention: OAuth 2.0 B2B Security (78/100).`
-      actionBtn = { label: 'Open Workspace Hub', route: '/app/workspace' }
     } else {
-      responseText = `I have reviewed your ${activeDomainName} workspace context for "${activeKeyword}". Your content scores 94/100 (Position #2). Would you like to run a new analysis or generate an executive report?`
-      actionBtn = { label: 'View Executive Report', route: '/app/reports' }
+      // Real data available — respond with actual values
+      const seoScore = lastAnalysis?.result?.seoScore
+      const predictedRank = lastAnalysis?.result?.predicted_rank
+      const noveltyScore = lastAnalysis?.result?.novelty_score
+      const entityCount = lastAnalysis?.result?.entities?.length || 0
+      const keyword = lastAnalysis?.keyword || activeDomainName
+
+      if (q.includes('score') || q.includes('seo') || q.includes('grade')) {
+        responseText = `[Source: Current Analysis Snapshot]\n\nThe SEO Score for "${keyword}" is ${seoScore ?? '—'}${seoScore ? '/100' : ''} (${currentHealth}).\nPredicted rank: ${predictedRank ? '#' + predictedRank : 'not yet computed'}.\nNovelty score: ${noveltyScore != null ? Math.round(noveltyScore * 100) + '%' : '—'}.`
+        actionBtn = { label: 'View Full Report', route: '/app/reports' }
+        richDataObj = { score: seoScore, rank: predictedRank ? '#' + predictedRank : '—', health: currentHealth }
+      } else if (q.includes('rank') || q.includes('position')) {
+        responseText = `[Source: Current Analysis Snapshot]\n\nPredicted ranking for "${keyword}": ${predictedRank ? '#' + predictedRank : 'not yet computed'} based on the ML ranking model.\nSEO Score: ${seoScore ?? '—'}/100. Novelty: ${noveltyScore != null ? Math.round(noveltyScore * 100) + '%' : '—'}.`
+        actionBtn = { label: 'View Full Report', route: '/app/reports' }
+      } else if (q.includes('entity') || q.includes('graph') || q.includes('concept')) {
+        responseText = `[Source: Knowledge Graph Entity Database]\n\n${entityCount} entities were extracted from your last analysis of "${keyword}" using the spaCy NLP pipeline.\nExplore the full Knowledge Graph to visualize entity relationships and clusters.`
+        actionBtn = { label: 'Inspect Knowledge Graph', route: '/app/graph' }
+      } else if (q.includes('novelty')) {
+        const pct = noveltyScore != null ? Math.round(noveltyScore * 100) : null
+        responseText = pct != null
+          ? `[Source: Current Analysis Snapshot]\n\nNovelty score for "${keyword}": ${pct}%.\n${pct >= 35 ? '✓ Above the 35% uniqueness threshold — content is semantically differentiated.' : '⚠ Below the 35% threshold — consider adding more unique perspectives.'}`
+          : `Novelty score is not available. Run an analysis to compute it.`
+        actionBtn = { label: 'Run Analysis', route: '/app/analyze' }
+      } else if (q.includes('improve') || q.includes('fix') || q.includes('recommend')) {
+        const recs = lastAnalysis?.result?.recommendations || lastAnalysis?.raw?.recommendations || []
+        if (recs.length > 0) {
+          responseText = `[Source: Executive Recommendations Engine]\n\nTop recommendations for "${keyword}":\n${recs.slice(0, 3).map((r: any, i: number) => `${i + 1}. ${r.title || r.recommendation || r}`).join('\n')}`
+        } else {
+          responseText = `View the full executive report for "${keyword}" to see all recommendations and action items.`
+        }
+        actionBtn = { label: 'View Recommendations', route: '/app/reports' }
+      } else if (q.includes('keyword')) {
+        responseText = `[Source: Workspace Keyword Database]\n\nBrowse real B2B keywords scored by buyer intent, novelty opportunity, and priority matrix in the Keywords Explorer.`
+        actionBtn = { label: 'Open Keywords Explorer', route: '/app/keywords' }
+      } else if (q.includes('serp') || q.includes('competitor') || q.includes('ranks')) {
+        responseText = `[Source: SERP Intelligence Pipeline]\n\nRun a SERP Intelligence analysis for "${keyword}" to compare against live competitor data and discover content gaps.`
+        actionBtn = { label: 'Open SERP Intelligence', route: '/app/serp-intel' }
+      } else if (q.includes('generate') || q.includes('write') || q.includes('content')) {
+        responseText = `[Source: AI Content Studio Engine]\n\nGenerate optimized B2B content for "${keyword}" or any other keyword in the AI Content Studio.\nThe generator uses Gemini AI with novelty validation to ensure unique, high-ranking output.`
+        actionBtn = { label: 'Open AI Content Studio', route: '/app/generate' }
+      } else {
+        responseText = `[Source: Current Workspace Context]\n\nLast analysis: "${keyword}" scored ${seoScore ?? '—'}/100 with predicted rank ${predictedRank ? '#' + predictedRank : '—'}.\n\nWould you like to run a new analysis, view the report, or generate content?`
+        actionBtn = { label: 'View Report', route: '/app/reports' }
+      }
     }
 
     const aiMsg: ChatMessage = {

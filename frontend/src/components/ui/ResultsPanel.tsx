@@ -93,27 +93,7 @@ export function normalizeAnalyzeResponse(raw: Record<string, unknown>): AnalyzeR
   }
 }
 
-function ScoreDial({ value, color, label }: { value: number; color: string; label: string }) {
-  const r = 42
-  const circ = 2 * Math.PI * r
-  const offset = circ - value * circ
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <svg width="100" height="100" viewBox="0 0 100 100">
-        <circle cx="50" cy="50" r={r} fill="none" stroke="var(--border-subtle)" strokeWidth="6" />
-        <circle
-          cx="50" cy="50" r={r} fill="none" strokeWidth="6" strokeLinecap="round"
-          style={{ stroke: color, strokeDasharray: circ, strokeDashoffset: offset, transition: 'stroke-dashoffset 1s ease-out' }}
-          transform="rotate(-90 50 50)"
-        />
-        <text x="50" y="54" textAnchor="middle" fill={color} fontSize="16" fontWeight="700" fontFamily="Space Mono">
-          {Math.round(value * 100)}
-        </text>
-      </svg>
-      <p className="text-xs text-[var(--text-muted)] font-mono text-center leading-tight">{label}</p>
-    </div>
-  )
-}
+import ScoreCard from './ScoreCard'
 
 function RecCard({ rec }: { rec: { type: string; description: string; suggested_entities?: string[]; priority: string } }) {
   const [open, setOpen] = useState(false)
@@ -161,129 +141,236 @@ export default function ResultsPanel({ data }: { data: AnalyzeResult }) {
     Math.min(100, ranking.predicted_rank + 5),
   ]
 
+  // Section collapse states (persisted in session)
+  const [showNovelty, setShowNovelty] = useState(true)
+  const [showRanking, setShowRanking] = useState(true)
+  const [showRecs, setShowRecs] = useState(true)
+
+  // Derived strengths & gaps
+  const strengthsCount = (novelty.passed ? 1 : 0) + (authority.matched_entities?.length > 0 ? 1 : 0) + (ranking.confidence >= 0.7 ? 1 : 0)
+  const gapsCount = (authority.missing_entities?.length || 0) + (ranking.optimization_gaps?.length || 0)
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
-      className="space-y-6"
+      className="space-y-6 print:space-y-4"
     >
+      {/* ── Status Bar ───────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-3">
         {novelty.passed ? (
-          <span className="tag text-[var(--aurora)] border-[var(--aurora)]">
-            <CheckCircle className="w-3.5 h-3.5 mr-1" /> NOVELTY PASSED
+          <span className="tag text-[var(--aurora)] border-[var(--aurora)] flex items-center gap-1 font-bold">
+            <CheckCircle className="w-3.5 h-3.5" /> NOVELTY PASSED
           </span>
         ) : (
-          <span className="tag text-[var(--solar)] border-[var(--solar)]">
-            <AlertTriangle className="w-3.5 h-3.5 mr-1" /> NOVELTY FAILED
+          <span className="tag text-[var(--solar)] border-[var(--solar)] flex items-center gap-1 font-bold">
+            <AlertTriangle className="w-3.5 h-3.5" /> NOVELTY REVISION REQUIRED
           </span>
         )}
-        {loop_required && <span className="tag text-[var(--solar)] border-[var(--solar)]">REVISION REQUIRED</span>}
-        <span className="ml-auto font-mono text-xs text-[var(--text-muted)]">{total_processing_time_ms}ms pipeline</span>
+        {loop_required && <span className="tag text-[var(--solar)] border-[var(--solar)] font-bold">REVISION REQUIRED</span>}
+        <span className="ml-auto font-mono text-xs text-[var(--text-muted)]">{total_processing_time_ms}ms pipeline telemetry</span>
       </div>
 
+      {/* ── Executive Analysis Summary Banner ─────────────────────────────────── */}
+      <div className="card p-6 border border-[var(--aurora)]/30 bg-gradient-to-br from-[var(--bg-card)] to-[var(--bg-depth)] shadow-sm space-y-4">
+        <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
+          <div className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-[var(--aurora)]" />
+            <h3 className="font-bold text-base text-[var(--text-primary)]">Executive Analysis Summary</h3>
+          </div>
+          <span className="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-[var(--aurora)]/10 text-[var(--aurora)] border border-[var(--aurora)]/20 uppercase tracking-wider">
+            Analysis Complete
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-xs">
+          <div className="p-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border-subtle)]">
+            <span className="text-[10px] text-[var(--text-muted)] block uppercase font-bold">Overall Content Quality</span>
+            <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 mt-1 block">
+              {novelty.passed ? '🟢 Excellent Quality (Passed)' : '🟠 Revision Recommended'}
+            </span>
+          </div>
+
+          <div className="p-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border-subtle)]">
+            <span className="text-[10px] text-[var(--text-muted)] block uppercase font-bold">Identified Strengths</span>
+            <span className="text-sm font-bold text-[var(--aurora)] mt-1 block">
+              {strengthsCount} Key Strengths Detected
+            </span>
+          </div>
+
+          <div className="p-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border-subtle)]">
+            <span className="text-[10px] text-[var(--text-muted)] block uppercase font-bold">Content Gaps to Address</span>
+            <span className="text-sm font-bold text-amber-500 mt-1 block">
+              {gapsCount} Priority Gaps Found
+            </span>
+          </div>
+        </div>
+
+        <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+          <strong className="text-[var(--aurora)] font-bold">Primary Recommendation:</strong> {ranking.improvement_potential || 'Content meets baseline ranking signals. Address missing high-authority entities to push for Top 3 position.'}
+        </p>
+      </div>
+
+      {/* ── Section 1: Novelty Breakdown ─────────────────────────────────────── */}
       <div className="card p-6 reveal">
-        <h3 className="font-display font-semibold text-[var(--text-primary)] mb-5 flex items-center gap-2">
-          <BarChart2 className="w-4 h-4 text-[var(--aurora)]" /> Novelty Breakdown
-        </h3>
-        <div className="flex flex-wrap justify-around gap-4">
-          <ScoreDial value={novelty.novelty_score} color="var(--aurora)" label="Overall Novelty" />
-          <ScoreDial value={novelty.entity_novelty} color="var(--plasma)" label="Entity Novelty" />
-          <ScoreDial value={novelty.relationship_novelty} color="var(--stellar)" label="Relationship" />
-          <ScoreDial value={novelty.semantic_diversity} color="var(--gold)" label="Semantic Diversity" />
+        <div className="flex items-center justify-between mb-5 border-b border-[var(--border-subtle)] pb-3">
+          <h3 className="font-display font-semibold text-[var(--text-primary)] flex items-center gap-2">
+            <BarChart2 className="w-4 h-4 text-[var(--aurora)]" /> Content Novelty & Quality Breakdown
+          </h3>
+          <button
+            onClick={() => setShowNovelty(!showNovelty)}
+            className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] font-mono flex items-center gap-1"
+          >
+            {showNovelty ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            <span>{showNovelty ? 'Collapse' : 'Expand'}</span>
+          </button>
         </div>
-        <div className="mt-5 pt-4 border-t border-[var(--border-subtle)] flex flex-wrap gap-4 text-sm">
-          <div>
-            <p className="font-mono text-xs text-[var(--text-muted)] mb-0.5">Verdict</p>
-            <p className="text-[var(--text-primary)] font-medium">{novelty.verdict}</p>
-          </div>
-          <div>
-            <p className="font-mono text-xs text-[var(--text-muted)] mb-0.5">Similarity Score</p>
-            <p className="text-[var(--text-primary)] font-medium">{(novelty.similarity_score * 100).toFixed(1)}%</p>
-          </div>
-          <div>
-            <p className="font-mono text-xs text-[var(--text-muted)] mb-0.5">Threshold</p>
-            <p className="text-[var(--text-primary)] font-medium">{novelty.threshold}</p>
-          </div>
-        </div>
-        {novelty.reasoning && novelty.reasoning.length > 0 && (
-          <div className="mt-4 bg-[var(--bg-void)] border border-[var(--border-subtle)] rounded-lg p-3">
-            <p className="font-mono text-xs text-[var(--text-muted)] mb-1 uppercase">Analysis Reasoning</p>
-            <ul className="space-y-1">
-              {novelty.reasoning.map((reason: string, i: number) => (
-                <li key={i} className="text-xs text-[var(--text-secondary)] flex items-start gap-1.5">
-                  <span className="text-[var(--aurora)] shrink-0">→</span> {reason}
-                </li>
-              ))}
-            </ul>
+
+        {showNovelty && (
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <ScoreCard score={novelty.novelty_score} metricKey="novelty" />
+              <ScoreCard score={novelty.entity_novelty} metricKey="entity" />
+              <ScoreCard score={novelty.relationship_novelty} metricKey="relationship" />
+              <ScoreCard score={novelty.semantic_diversity} metricKey="diversity" />
+            </div>
+
+            <div className="pt-4 border-t border-[var(--border-subtle)] flex flex-wrap gap-4 text-sm font-mono">
+              <div>
+                <p className="text-xs text-[var(--text-muted)] mb-0.5">Verdict</p>
+                <p className="text-[var(--text-primary)] font-medium">{novelty.verdict}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[var(--text-muted)] mb-0.5">Similarity Score</p>
+                <p className="text-[var(--text-primary)] font-medium">{(novelty.similarity_score * 100).toFixed(1)}%</p>
+              </div>
+              <div>
+                <p className="text-xs text-[var(--text-muted)] mb-0.5">Threshold</p>
+                <p className="text-[var(--text-primary)] font-medium">{novelty.threshold}</p>
+              </div>
+            </div>
+
+            {novelty.reasoning && novelty.reasoning.length > 0 && (
+              <div className="bg-[var(--bg-void)] border border-[var(--border-subtle)] rounded-xl p-4">
+                <p className="font-mono text-xs text-[var(--text-muted)] mb-2 uppercase font-bold">Analysis Reasoning & Evidence</p>
+                <ul className="space-y-1.5">
+                  {novelty.reasoning.map((reason: string, i: number) => (
+                    <li key={i} className="text-xs text-[var(--text-secondary)] flex items-start gap-2">
+                      <span className="text-[var(--aurora)] shrink-0 font-bold">→</span> {reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 reveal">
-        <div className="lg:col-span-2 card p-6">
-          <h3 className="font-display font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-            <Target className="w-4 h-4 text-[var(--aurora)]" /> Ranking Prediction
+      {/* ── Section 2: Ranking Prediction & Authority Coverage ──────────────── */}
+      <div className="card p-6 reveal space-y-4">
+        <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
+          <h3 className="font-display font-semibold text-[var(--text-primary)] flex items-center gap-2">
+            <Target className="w-4 h-4 text-[var(--aurora)]" /> Ranking Prediction & Entity Coverage
           </h3>
-          <div className="flex items-end gap-2 mb-3">
-            <span className="font-mono text-5xl font-bold text-[var(--aurora)]">#{ranking.predicted_rank}</span>
-            <span className="text-[var(--text-muted)] text-sm mb-1 font-mono">
-              [{positionRange[0]}–{positionRange[1]}]
-            </span>
-          </div>
-          <p className="text-sm text-[var(--text-muted)] mb-2">{ranking.improvement_potential}</p>
-          <div className="flex items-center gap-2 mt-2">
-            <div
-              className="h-2 rounded-full bg-gradient-to-r from-[var(--aurora)] to-[var(--plasma)]"
-              style={{ width: `${ranking.confidence * 100}%`, maxWidth: '100%' }}
-            />
-            <span className="font-mono text-xs text-[var(--text-muted)]">{(ranking.confidence * 100).toFixed(0)}% conf</span>
-          </div>
-          {ranking.optimization_gaps && ranking.optimization_gaps.length > 0 && (
-            <div className="mt-4 pt-3 border-t border-[var(--border-subtle)]">
-              <p className="font-mono text-xs text-[var(--text-muted)] mb-2 uppercase">Optimization Gaps</p>
-              <ul className="space-y-1">
-                {ranking.optimization_gaps.map((gap: string, i: number) => (
-                  <li key={i} className="text-xs text-[var(--text-secondary)] flex items-start gap-1.5">
-                    <span className="text-[var(--solar)] shrink-0">•</span> {gap}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <button
+            onClick={() => setShowRanking(!showRanking)}
+            className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] font-mono flex items-center gap-1"
+          >
+            {showRanking ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            <span>{showRanking ? 'Collapse' : 'Expand'}</span>
+          </button>
         </div>
 
-        <div className="card p-5">
-          <h3 className="font-display font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-            <Shield className="w-4 h-4 text-[var(--aurora)]" /> Authority Coverage
-          </h3>
-          <div className="flex items-end gap-2 mb-3">
-            <span className="font-mono text-5xl font-bold text-[var(--aurora)]">
-              {(authority.authority_score * 100).toFixed(0)}%
-            </span>
-            <span className="text-[var(--text-muted)] text-sm mb-1">/{authority.total_checked} entities</span>
-          </div>
-          {authority.missing_entities.length > 0 && (
-            <div>
-              <p className="font-mono text-xs text-[var(--text-muted)] mb-1.5">Missing</p>
-              <div className="flex flex-wrap gap-1">
-                {authority.missing_entities.slice(0, 3).map((e: string, i: number) => (
-                  <span key={i} className="tag text-[var(--solar)] border-[var(--solar)]">{e}</span>
-                ))}
+        {showRanking && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 p-4 bg-[var(--bg-depth)] rounded-2xl border border-[var(--border-subtle)] space-y-3">
+              <h4 className="font-bold text-xs text-[var(--text-primary)] font-mono uppercase">Predicted SERP Position</h4>
+              <div className="flex items-end gap-2">
+                <span className="font-mono text-5xl font-bold text-[var(--aurora)]">#{ranking.predicted_rank}</span>
+                <span className="text-[var(--text-muted)] text-sm mb-1 font-mono">
+                  [{positionRange[0]}–{positionRange[1]}]
+                </span>
               </div>
+              <p className="text-xs text-[var(--text-muted)]">{ranking.improvement_potential}</p>
+              <div className="flex items-center gap-2 pt-2">
+                <div
+                  className="h-2 rounded-full bg-gradient-to-r from-[var(--aurora)] to-[var(--plasma)]"
+                  style={{ width: `${ranking.confidence * 100}%`, maxWidth: '100%' }}
+                />
+                <span className="font-mono text-xs text-[var(--text-muted)]">{(ranking.confidence * 100).toFixed(0)}% model confidence</span>
+              </div>
+
+              {ranking.optimization_gaps && ranking.optimization_gaps.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-[var(--border-subtle)]">
+                  <p className="font-mono text-xs text-[var(--text-muted)] mb-2 uppercase font-bold">Optimization Gaps</p>
+                  <ul className="space-y-1">
+                    {ranking.optimization_gaps.map((gap: string, i: number) => (
+                      <li key={i} className="text-xs text-[var(--text-secondary)] flex items-start gap-1.5">
+                        <span className="text-[var(--solar)] shrink-0">•</span> {gap}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+
+            <div className="p-4 bg-[var(--bg-depth)] rounded-2xl border border-[var(--border-subtle)] space-y-3">
+              <h4 className="font-bold text-xs text-[var(--text-primary)] font-mono uppercase">Authority Entity Coverage</h4>
+              <div className="flex items-end gap-2">
+                <span className="font-mono text-5xl font-bold text-[var(--aurora)]">
+                  {(authority.authority_score * 100).toFixed(0)}%
+                </span>
+                <span className="text-[var(--text-muted)] text-sm mb-1 font-mono">/{authority.total_checked} entities</span>
+              </div>
+
+              {authority.matched_entities.length > 0 && (
+                <div>
+                  <p className="font-mono text-[10px] text-emerald-600 font-bold uppercase mb-1">Covered Entities</p>
+                  <div className="flex flex-wrap gap-1">
+                    {authority.matched_entities.slice(0, 4).map((e: string, i: number) => (
+                      <span key={i} className="tag text-emerald-600 border-emerald-500/30 bg-emerald-500/10 text-[10px]">{e}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {authority.missing_entities.length > 0 && (
+                <div className="pt-2">
+                  <p className="font-mono text-[10px] text-amber-500 font-bold uppercase mb-1">Missing High-Value Entities</p>
+                  <div className="flex flex-wrap gap-1">
+                    {authority.missing_entities.slice(0, 4).map((e: string, i: number) => (
+                      <span key={i} className="tag text-[var(--solar)] border-[var(--solar)] text-[10px]">{e}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* ── Section 3: Priority Action Plan & Recommendations ─────────────────── */}
       {recommendations.length > 0 && (
-        <div className="reveal">
-          <h3 className="font-display font-semibold text-[var(--text-primary)] mb-3 flex items-center gap-2">
-            <Info className="w-4 h-4 text-[var(--text-secondary)]" />
-            Recommendations ({recommendations.length})
-          </h3>
-          <div className="space-y-3">
-            {recommendations.map((rec: any, i: number) => <RecCard key={i} rec={rec} />)}
+        <div className="card p-6 reveal space-y-4">
+          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
+            <h3 className="font-display font-semibold text-[var(--text-primary)] flex items-center gap-2">
+              <Info className="w-4 h-4 text-[var(--aurora)]" />
+              Executive Action Plan & Recommendations ({recommendations.length})
+            </h3>
+            <button
+              onClick={() => setShowRecs(!showRecs)}
+              className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] font-mono flex items-center gap-1"
+            >
+              {showRecs ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              <span>{showRecs ? 'Collapse' : 'Expand'}</span>
+            </button>
           </div>
+
+          {showRecs && (
+            <div className="space-y-3">
+              {recommendations.map((rec: any, i: number) => <RecCard key={i} rec={rec} />)}
+            </div>
+          )}
         </div>
       )}
     </motion.div>

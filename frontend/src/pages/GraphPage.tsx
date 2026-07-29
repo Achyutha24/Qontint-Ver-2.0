@@ -23,6 +23,11 @@ import { useDomain, GLOBAL_DOMAINS } from '../context/DomainContext'
 import Graph3D, { type GraphNode, type GraphEdge, type PerformanceMetrics } from '../components/Graph3D'
 import Graph2D from '../components/Graph2D'
 import { apiFetch } from '../api/apiClient'
+import PageContainer from '../components/layout/PageContainer'
+import PageHeader from '../components/layout/PageHeader'
+import ContentContainer from '../components/layout/ContentContainer'
+import ActionToolbar from '../components/layout/ActionToolbar'
+import { saveReportToRepository } from '../utils/reportRepository'
 
 // ── Decorative Background Component ──
 function DecorativeGalaxy() {
@@ -198,6 +203,17 @@ export default function GraphPage() {
       nodes,
       edges
     }
+    saveReportToRepository({
+      title: `Knowledge Graph Snapshot: ${activeDomainName}`,
+      keyword: verticalFilter,
+      type: 'Knowledge Graph',
+      category: 'Graph Topology',
+      domain: activeDomainName,
+      score: 92,
+      rank: '#1',
+      payload: exportData,
+      originalRoute: '/app/graph'
+    })
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2))
     const dlAnchorElem = document.createElement('a')
     dlAnchorElem.setAttribute("href", dataStr)

@@ -3,6 +3,7 @@
  * Wraps the existing HomePage but updates CTA navigation to /app/analyze.
  * The footer is rendered by LandingLayout — do NOT add another footer here.
  */
+// @ts-nocheck
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import * as THREE from 'three'

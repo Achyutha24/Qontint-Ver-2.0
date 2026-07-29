@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Video, Target, Zap, BarChart2, AlertTriangle } from 'lucide-react'

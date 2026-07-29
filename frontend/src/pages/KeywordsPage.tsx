@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, X, Target } from 'lucide-react'
 import * as THREE from 'three'
@@ -312,7 +312,7 @@ export default function KeywordsPage() {
             <h1 className="page-title gradient-text">Entity Radar</h1>
           </div>
           <p className="text-[var(--text-secondary)] text-base max-w-xl">
-            Browse and filter the full 116-keyword taxonomy across 4 verticals with intent, novelty, and priority matrix scores.
+            Browse and filter the full {data ? `${data.total}-keyword` : 'B2B keyword'} taxonomy across verticals with intent, novelty, and priority matrix scores.
           </p>
         </div>
 

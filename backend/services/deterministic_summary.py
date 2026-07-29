@@ -251,23 +251,38 @@ def build_knowledge_synthesis(
     If ai_synthesis is empty or missing fields, uses deterministic data.
     Always returns a populated structure.
     """
-    ks = ai_synthesis.get("knowledge_synthesis", {}) if ai_synthesis else {}
+    if isinstance(ai_synthesis, dict):
+        raw_ks = ai_synthesis.get("knowledge_synthesis")
+    else:
+        raw_ks = None
+
+    if isinstance(raw_ks, dict):
+        ks = raw_ks
+    elif isinstance(raw_ks, str) and raw_ks.strip():
+        ks = {"unified_understanding": raw_ks.strip()}
+    else:
+        ks = {}
+
+    unified = ks.get("unified_understanding") if isinstance(ks.get("unified_understanding"), str) else None
+    insights = ks.get("key_insights") if isinstance(ks.get("key_insights"), list) else None
+    concepts = ks.get("best_concepts") if isinstance(ks.get("best_concepts"), list) else None
+    opps = ks.get("actionable_opportunities") if isinstance(ks.get("actionable_opportunities"), list) else None
 
     return {
         "unified_understanding": (
-            ks.get("unified_understanding")
+            unified
             or f"The SERP for \"{keyword}\" reflects {_search_intent_summary(deterministic_data)}"
         ),
         "key_insights": (
-            ks.get("key_insights")
+            insights
             or _build_key_insights(keyword, deterministic_data)
         ),
         "best_concepts": (
-            ks.get("best_concepts")
+            concepts
             or (deterministic_data.get("topic_coverage", {}).get("main_topics", [])[:4])
         ),
         "actionable_opportunities": (
-            ks.get("actionable_opportunities")
+            opps
             or (deterministic_data.get("knowledge_gaps", {}).get("content_opportunities", []))
         ),
     }

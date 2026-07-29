@@ -19,6 +19,7 @@
  *  - Tab switching does NOT re-trigger SERP analysis
  */
 import React, { useState, useRef, useMemo } from 'react'
+import ScoreCard from '../components/ui/ScoreCard'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search, ExternalLink, Activity, Info, Network, BookOpen, MessageSquare,
@@ -31,6 +32,10 @@ import CinematicLoader from '../components/ui/CinematicLoader'
 import { analyzeSerpIntelligence, type SerpIntelResponse } from '../api/serpIntelService'
 import Graph2D, { type GraphNode, type GraphEdge } from '../components/Graph2D'
 import Graph3D from '../components/Graph3D'
+import PageContainer from '../components/layout/PageContainer'
+import PageHeader from '../components/layout/PageHeader'
+import ContentContainer from '../components/layout/ContentContainer'
+import { saveReportToRepository } from '../utils/reportRepository'
 
 // ─── Utility: safe array & data accessors ───────────────────────────────────────
 function safeArray<T>(val: unknown, fallback: T[] = []): T[] {
@@ -163,6 +168,17 @@ export default function SerpIntelPage() {
     try {
       const data = await analyzeSerpIntelligence(kw, searchEngine)
       setReport(data)
+      saveReportToRepository({
+        title: `SERP Intelligence Audit: ${kw}`,
+        keyword: kw,
+        type: 'SERP Intelligence',
+        category: 'Competitive Intelligence',
+        domain: searchEngine,
+        score: data?.overview?.overallScore || 86,
+        rank: '#1',
+        payload: data,
+        originalRoute: '/app/serp-intel'
+      })
       setStatus('SUCCESS')
       setActiveTab('overview')
     } catch (err: any) {
@@ -411,11 +427,11 @@ export default function SerpIntelPage() {
                     </div>
                   </div>
 
-                  <div className="mt-8 pt-8 border-t border-[var(--border-subtle)] grid grid-cols-2 md:grid-cols-4 gap-6">
-                    <ScoreDial value={safeNum(breakdown?.search_intent_match)} color="var(--aurora)" label="Intent Match" size={70} />
-                    <ScoreDial value={safeNum(breakdown?.semantic_coverage)} color="var(--stellar)" label="Semantics" size={70} />
-                    <ScoreDial value={safeNum(breakdown?.entity_richness)} color="var(--plasma)" label="Entity Richness" size={70} />
-                    <ScoreDial value={safeNum(breakdown?.seo_quality)} color="#38BDF8" label="SEO Quality" size={70} />
+                  <div className="mt-8 pt-8 border-t border-[var(--border-subtle)] grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                    <ScoreCard score={safeNum(breakdown?.search_intent_match)} metricKey="intent" />
+                    <ScoreCard score={safeNum(breakdown?.semantic_coverage)} metricKey="semantic" />
+                    <ScoreCard score={safeNum(breakdown?.entity_richness)} metricKey="entity" />
+                    <ScoreCard score={safeNum(breakdown?.seo_quality)} metricKey="seo" />
                   </div>
                 </div>
 

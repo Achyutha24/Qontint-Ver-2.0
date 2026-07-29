@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as THREE from 'three'

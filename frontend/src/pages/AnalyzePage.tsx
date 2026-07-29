@@ -12,6 +12,10 @@ import CompetitorComparisonModal from '../components/ui/CompetitorComparisonModa
 import { normalizeAnalyzeResponse } from '../components/ui/ResultsPanel'
 import type { AnalyzeResult } from '../components/ui/ResultsPanel'
 import { apiFetch } from '../api/apiClient'
+import PageContainer from '../components/layout/PageContainer'
+import PageHeader from '../components/layout/PageHeader'
+import ContentContainer from '../components/layout/ContentContainer'
+import { saveReportToRepository } from '../utils/reportRepository'
 
 
 
@@ -177,6 +181,28 @@ export default function AnalyzePage() {
       })
       const normalized = normalizeAnalyzeResponse(data as Record<string, unknown>)
       setResult(normalized)
+      // Persist last real analysis result for Reports, Dashboard, and AI Assistant
+      try {
+        const snapshot = {
+          keyword,
+          vertical: domain,
+          analyzedAt: new Date().toISOString(),
+          result: normalized,
+          raw: data,
+        }
+        localStorage.setItem('qontint_last_analysis', JSON.stringify(snapshot))
+        saveReportToRepository({
+          title: `Neural SEO Audit: ${keyword}`,
+          keyword,
+          type: 'Analyze',
+          category: 'Content Audit',
+          domain,
+          score: Math.round(((normalized.authority?.authority_score || 0.8) * 0.5 + (normalized.novelty?.novelty_score || 0.4) * 0.5) * 100),
+          rank: `#${normalized.ranking?.predicted_rank || 3}`,
+          payload: snapshot,
+          originalRoute: '/app/analyze'
+        })
+      } catch (_) { /* storage quota error — not critical */ }
     } catch (err: any) {
       setError(err.message || 'An error occurred during analysis.')
     } finally {
@@ -186,23 +212,17 @@ export default function AnalyzePage() {
   }
 
   return (
-    <div className="min-h-screen pt-8 pb-20 px-4 relative">
+    <PageContainer>
       <canvas ref={canvasRef} className="fixed inset-0 w-full h-full pointer-events-none z-0 opacity-40" />
 
-      <div 
-        className="max-w-6xl mx-auto space-y-6 relative z-10"
-        
-      >
-        <div className="mb-10 reveal">
-          <div className="flex items-center gap-3 mb-2">
-            <Cpu className="w-8 h-8 text-[var(--aurora)]" />
-            <h1 className="page-title gradient-text">Neural Dissection Chamber</h1>
-          </div>
-          <p className="text-[var(--text-secondary)] max-w-2xl text-lg">
-            Paste your content and target keyword. Qontint extracts entities, scores semantic novelty against live SERP data, and predicts your ranking position with confidence intervals.
-          </p>
-        </div>
+      <PageHeader
+        title="Neural Dissection Chamber"
+        subtitle="Paste your content and target keyword. Qontint extracts entities, scores semantic novelty against live SERP data, and predicts your ranking position with confidence intervals."
+        badge="Enterprise Analyze Workspace"
+        icon={Cpu}
+      />
 
+      <ContentContainer>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 reveal">
           <motion.div
             initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.08 }}
@@ -300,17 +320,16 @@ export default function AnalyzePage() {
             </div>
           </motion.div>
         </div>
-      </div>
-
-      <CompetitorComparisonModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        data={result}
-        isLoading={isAnalyzing}
-        error={error}
-        loadingLogs={loadingLogs}
-        userKeyword={keyword}
-      />
-    </div>
+        <CompetitorComparisonModal 
+          isOpen={isModalOpen} 
+          onClose={() => setIsModalOpen(false)} 
+          data={result}
+          isLoading={isAnalyzing}
+          error={error}
+          loadingLogs={loadingLogs}
+          userKeyword={keyword}
+        />
+      </ContentContainer>
+    </PageContainer>
   )
 }

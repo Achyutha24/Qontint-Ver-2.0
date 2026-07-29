@@ -16,7 +16,7 @@
  *      7. Project Files & Document Attachments
  *      8. Future-Ready Architecture (Team Roles, Task Assignment, Automated Alerts)
  */
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -26,6 +26,11 @@ import {
   FileUp, Users, Settings, Tag, ShieldCheck, Bookmark, ArrowUpRight
 } from 'lucide-react'
 import { useDomain, GLOBAL_DOMAINS } from '../context/DomainContext'
+import { apiFetch } from '../api/apiClient'
+import PageContainer from '../components/layout/PageContainer'
+import PageHeader from '../components/layout/PageHeader'
+import ContentContainer from '../components/layout/ContentContainer'
+import ActionToolbar from '../components/layout/ActionToolbar'
 
 interface TrackedKeyword {
   id: string
@@ -107,85 +112,27 @@ export default function WorkspacePage() {
   // Task check state
   const [newNoteText, setNewNoteText] = useState('')
 
-  // Mock Projects Database
-  const [projects, setProjects] = useState<SEOProject[]>([
-    {
-      id: 'p1',
-      name: 'Payment Gateway Security',
-      description: 'Comprehensive technical B2B content campaign targeting payment gateway developers and CTOs.',
-      primaryKeyword: 'Payment Gateway Security API',
-      industry: 'FinTech / Security',
-      seoScore: 94,
-      predictedRank: '#2',
-      lastUpdated: '10 mins ago',
-      status: 'Active',
-      targetAudience: 'CTOs, Lead Security Engineers, Payment Architects',
-      targetRegion: 'North America & EU',
-      createdDate: '2026-07-01',
-      keywords: [
-        { id: 'k1', keyword: 'Payment Gateway Security API', seoScore: 94, predictedRank: '#2', authority: 88, novelty: 85, status: 'Ranking Top 3' },
-        { id: 'k2', keyword: 'PCI DSS 4.0 Compliance Integration', seoScore: 88, predictedRank: '#3', authority: 84, novelty: 82, status: 'Improving' },
-        { id: 'k3', keyword: 'OAuth 2.0 Webhook Security', seoScore: 78, predictedRank: '#6', authority: 75, novelty: 80, status: 'Needs Optimization' },
-      ],
-      contents: [
-        { id: 'c1', title: 'Payment Gateway Security API Architecture Guide 2026', keyword: 'Payment Gateway Security API', contentType: 'Technical Guide', generatedDate: '2026-07-25', qualityScore: 94 },
-        { id: 'c2', title: 'PCI DSS 4.0 Webhook Idempotency Benchmark', keyword: 'PCI DSS 4.0 Compliance Integration', contentType: 'Benchmark Report', generatedDate: '2026-07-20', qualityScore: 88 },
-      ],
-      reports: [
-        { id: 'r1', title: 'Executive SEO Audit - Payment Gateway', keyword: 'Payment Gateway Security API', seoScore: 94, createdDate: '2026-07-25' },
-        { id: 'r2', title: 'Stripe Competitor Benchmark Report', keyword: 'PCI DSS 4.0 Integration', seoScore: 88, createdDate: '2026-07-20' },
-      ],
-      competitors: [
-        { domain: 'stripe.com/docs', authority: '94%', contentCount: 3100, rankingKeywords: 420, opportunityScore: 85 },
-        { domain: 'adyen.com/developers', authority: '85%', contentCount: 1950, rankingKeywords: 280, opportunityScore: 92 },
-      ],
-      notes: [
-        { id: 'n1', text: 'Add dedicated H2 section on PCI DSS 4.0 compliance requirement', completed: true, category: 'Task' },
-        { id: 'n2', text: 'Implement structured FAQPage JSON-LD schema markup', completed: false, category: 'Task' },
-        { id: 'n3', text: 'Include benchmarking diagram comparing OAuth 2.0 latency', completed: false, category: 'Idea' },
-      ]
-    },
-    {
-      id: 'p2',
-      name: 'PCI DSS 4.0 Compliance Standard',
-      description: 'Regulatory audit campaign focused on compliance frameworks and technical validation.',
-      primaryKeyword: 'PCI DSS 4.0 Standard',
-      industry: 'Compliance / Legal',
-      seoScore: 88,
-      predictedRank: '#3',
-      lastUpdated: '2 hours ago',
-      status: 'Active',
-      targetAudience: 'Compliance Officers & DevSecOps Teams',
-      targetRegion: 'Global',
-      createdDate: '2026-07-10',
-      keywords: [
-        { id: 'k4', keyword: 'PCI DSS 4.0 Standard', seoScore: 88, predictedRank: '#3', authority: 82, novelty: 80, status: 'Ranking Top 3' },
-      ],
-      contents: [],
-      reports: [],
-      competitors: [],
-      notes: []
-    },
-    {
-      id: 'p3',
-      name: 'Stripe Payments API Integration',
-      description: 'Developer tutorial series covering Stripe webhook handling and idempotency.',
-      primaryKeyword: 'Stripe Payments API',
-      industry: 'Developer Tools',
-      seoScore: 92,
-      predictedRank: '#1',
-      lastUpdated: 'Yesterday',
-      status: 'Active',
-      targetAudience: 'Full-Stack Developers',
-      targetRegion: 'North America',
-      createdDate: '2026-07-15',
-      keywords: [],
-      contents: [],
-      reports: [],
-      competitors: [],
-      notes: []
+  // ── Real keywords from backend ──────────────────────────────────────────────
+  const [realKeywords, setRealKeywords] = useState<any[]>([])
+  const [kwLoading, setKwLoading] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadKeywords() {
+      setKwLoading(true)
+      try {
+        const data = await apiFetch<any>(`/api/v1/keywords?vertical=${encodeURIComponent(verticalFilter)}&limit=50`)
+        if (!cancelled) setRealKeywords(data.keywords || [])
+      } catch (_) { /* backend may not be running in dev */ }
+      finally { if (!cancelled) setKwLoading(false) }
     }
-  ])
+    loadKeywords()
+    return () => { cancelled = true }
+  }, [verticalFilter])
+
+  // ── Projects Database — starts empty, user creates projects ─────────────────
+  // Projects are client-side managed (no backend project storage yet)
+  const [projects, setProjects] = useState<SEOProject[]>([])
 
   // Selected Active Project
   const selectedProject = useMemo(() => {
@@ -345,7 +292,24 @@ export default function WorkspacePage() {
           </h3>
 
           <div className="space-y-3">
-            {filteredProjects.map(proj => {
+            {filteredProjects.length === 0 ? (
+              <div className="p-8 rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-card)] text-center space-y-4">
+                <Briefcase className="w-10 h-10 text-[var(--text-muted)] opacity-30 mx-auto" />
+                <div>
+                  <p className="font-bold text-sm text-[var(--text-primary)]">No Projects Yet</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1 font-mono">
+                    Create your first SEO project to organize keywords, content, and reports.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setCreateModalOpen(true)}
+                  className="btn-primary px-4 py-2 text-xs flex items-center gap-2 mx-auto"
+                >
+                  <Plus size={12} /> Create First Project
+                </button>
+              </div>
+            ) : (
+              filteredProjects.map(proj => {
               const isSelected = selectedProjectId === proj.id
               return (
                 <div
@@ -386,7 +350,8 @@ export default function WorkspacePage() {
                   </div>
                 </div>
               )
-            })}
+            })
+            )}
           </div>
         </div>
 
