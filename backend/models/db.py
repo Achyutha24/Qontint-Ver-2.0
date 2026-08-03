@@ -214,8 +214,11 @@ class SearchHistory(Base):
 class AnalysisCache(Base):
     __tablename__ = "analysis_cache"
     id = Column(String(36), primary_key=True, default=gen_uuid)
-    cache_key = Column(String(255), unique=True, index=True)
+    cache_key = Column(String(255), index=True)
     keyword = Column(Text, nullable=False)
+    analysis_version = Column(Integer, default=1)
+    analysis_type = Column(String(50), default="SERP Intelligence")
+    is_latest = Column(Boolean, default=True)
     serp_results_json = Column(Text)
     top_3_json = Column(Text)
     extracted_content_json = Column(Text)
@@ -234,7 +237,16 @@ class AnalysisCache(Base):
     response_time_ms = Column(Integer, default=0)
     error_log = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now())
     expiry_time = Column(DateTime)
+
+    # Snapshots for version reproducibility & trend analysis
+    semantic_snapshot_json = Column(Text)
+    serp_snapshot_json = Column(Text)
+    entity_snapshot_json = Column(Text)
+    cluster_snapshot_json = Column(Text)
+    recommendation_snapshot_json = Column(Text)
+
 class ContentStorage(Base):
     __tablename__ = "content_storage"
     id = Column(String(36), primary_key=True, default=gen_uuid)
@@ -257,6 +269,8 @@ class ReportStorage(Base):
     id = Column(String(36), primary_key=True, default=gen_uuid)
     analysis_id = Column(String(36), index=True)
     report_json = Column(Text, nullable=False)
+    analysis_version = Column(Integer, default=1)
+    is_latest = Column(Boolean, default=True)
     report_version = Column(String(50))
     schema_version = Column(String(50))
     prompt_version = Column(String(50))
@@ -304,3 +318,10 @@ class ApiUsageMetrics(Base):
     retries = Column(Integer, default=0)
     rate_limits = Column(Integer, default=0)
     remaining_credits = Column(Integer, default=0)
+
+class SchemaVersion(Base):
+    __tablename__ = "schema_version"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    version = Column(String(50), nullable=False)
+    description = Column(Text)
+    applied_at = Column(DateTime, server_default=func.now())

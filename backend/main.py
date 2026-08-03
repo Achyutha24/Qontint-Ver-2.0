@@ -53,15 +53,30 @@ _startup_time = _time.time()
 async def lifespan(app: FastAPI):
     logger.info("🚀 Qontint API starting up (SIMPLIFIED MODE)...")
 
-    # ── Auto-create all SQLite tables if they don't exist ─────────────────────
+    # ── Auto-migrate & validate database schema ─────────────────────────────
     try:
         from models.db import Base
         from db.postgres import engine
+        from db.migration_manager import run_auto_migrations, validate_schema_integrity
+
+        # Step 1: Synchronize missing columns/tables
+        migrated = run_auto_migrations()
+        if not migrated:
+            logger.warning("⚠️ Auto-migration reported warnings — verifying schema integrity...")
+
+        # Step 2: Ensure all SQLAlchemy models have their tables initialized
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-        logger.info("✅ Database tables ensured")
+
+        # Step 3: Post-migration schema validation
+        is_valid, missing = validate_schema_integrity()
+        if not is_valid:
+            logger.error("❌ Database schema validation failed! Missing columns: %s", missing)
+            raise RuntimeError(f"Database schema out of sync: missing columns {missing}")
+
+        logger.info("✅ Database schema fully synchronized and verified")
     except Exception as exc:
-        logger.error("❌ Database init failed: %s", exc)
+        logger.error("❌ Database initialization failed: %s", exc, exc_info=True)
         raise
 
     # Pre-load NLP / ML models so first analyze is fast

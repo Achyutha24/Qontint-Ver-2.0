@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Cpu, AlertTriangle } from 'lucide-react'
 import * as THREE from 'three'
@@ -8,7 +9,6 @@ import { useScrollReveal } from '../hooks/useScrollReveal'
 
 import MagneticButton from '../components/ui/MagneticButton'
 import { useDomain } from '../context/DomainContext'
-import CompetitorComparisonModal from '../components/ui/CompetitorComparisonModal'
 import { normalizeAnalyzeResponse } from '../components/ui/ResultsPanel'
 import type { AnalyzeResult } from '../components/ui/ResultsPanel'
 import { apiFetch } from '../api/apiClient'
@@ -17,34 +17,24 @@ import PageHeader from '../components/layout/PageHeader'
 import ContentContainer from '../components/layout/ContentContainer'
 import { saveReportToRepository } from '../utils/reportRepository'
 
-
-
-
-
 export default function AnalyzePage() {
+  const navigate = useNavigate()
   const [keyword, setKeyword] = useState('')
   const [content, setContent] = useState('')
   const { domain, activeDomainName } = useDomain()
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [result, setResult] = useState<AnalyzeResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  
-  const [loadingLogs, setLoadingLogs] = useState<string[]>([])
-  
   const [wordCount, setWordCount] = useState(0)
 
   // Re-trigger scroll reveal when results are added to the DOM
   useScrollReveal([result])
-  
-  
+
   const { theme } = useTheme()
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  
+
   useThreeScene(canvasRef, (scene, camera) => {
     const isDark = theme === 'dark'
-    
-    // Background Texture
     const canvas = document.createElement('canvas')
     canvas.width = 128; canvas.height = 128
     const ctx = canvas.getContext('2d')!
@@ -62,7 +52,6 @@ export default function AnalyzePage() {
     tex.repeat.set(20, 20)
     scene.background = null 
 
-    // Icosahedron (Neural Core)
     const coreGeo = new THREE.IcosahedronGeometry(4, 0)
     const positions = coreGeo.attributes.position.array
     const group = new THREE.Group()
@@ -134,11 +123,12 @@ export default function AnalyzePage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   
   useEffect(() => {
-    setWordCount(content.trim() ? content.trim().split(/\s+/).length : 0)
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+    if (!content) {
+      setWordCount(0)
+      return
     }
+    const words = content.trim().match(/\S+/g)
+    setWordCount(words ? words.length : 0)
   }, [content])
 
   const handleAnalyze = async () => {
@@ -150,29 +140,6 @@ export default function AnalyzePage() {
     setIsAnalyzing(true)
     setError(null)
     setResult(null)
-    setIsModalOpen(true)
-    
-    const stages = [
-      '✓ Extracting entities',
-      '✓ Running novelty scoring',
-      '✓ Running ranking prediction',
-      '✓ Searching live Google',
-      '✓ Fetching Top 3 competitors',
-      '✓ Extracting competitor content',
-      '✓ Comparing articles',
-      '✓ Running Gemini analysis',
-      '✓ Building recommendations',
-      '✓ Opening report'
-    ]
-    setLoadingLogs([stages[0]])
-    
-    let stageIdx = 1
-    const logInterval = setInterval(() => {
-      if (stageIdx < stages.length) {
-        setLoadingLogs(prev => [...prev, stages[stageIdx]])
-        stageIdx++
-      }
-    }, 1200)
 
     try {
       const data = await apiFetch<any>('/api/v1/analyze', {
@@ -181,32 +148,33 @@ export default function AnalyzePage() {
       })
       const normalized = normalizeAnalyzeResponse(data as Record<string, unknown>)
       setResult(normalized)
-      // Persist last real analysis result for Reports, Dashboard, and AI Assistant
-      try {
-        const snapshot = {
-          keyword,
-          vertical: domain,
-          analyzedAt: new Date().toISOString(),
-          result: normalized,
-          raw: data,
-        }
-        localStorage.setItem('qontint_last_analysis', JSON.stringify(snapshot))
-        saveReportToRepository({
-          title: `Neural SEO Audit: ${keyword}`,
-          keyword,
-          type: 'Analyze',
-          category: 'Content Audit',
-          domain,
-          score: Math.round(((normalized.authority?.authority_score || 0.8) * 0.5 + (normalized.novelty?.novelty_score || 0.4) * 0.5) * 100),
-          rank: `#${normalized.ranking?.predicted_rank || 3}`,
-          payload: snapshot,
-          originalRoute: '/app/analyze'
-        })
-      } catch (_) { /* storage quota error — not critical */ }
+
+      const snapshot = {
+        keyword,
+        vertical: domain,
+        analyzedAt: new Date().toISOString(),
+        result: normalized,
+        raw: data,
+      }
+      localStorage.setItem('qontint_last_analysis', JSON.stringify(snapshot))
+      saveReportToRepository({
+        title: `Neural SEO Audit: ${keyword}`,
+        keyword,
+        type: 'Analyze',
+        category: 'Content Audit',
+        domain,
+        score: Math.round(((normalized.authority?.authority_score || 0.8) * 0.5 + (normalized.novelty?.novelty_score || 0.4) * 0.5) * 100),
+        rank: `#${normalized.ranking?.predicted_rank || 3}`,
+        payload: snapshot,
+        originalRoute: '/app/analyze'
+      })
+
+      // Architectural Refactor: Navigate to standalone Report Route!
+      // React Router completely unmounts AnalyzePage & AppLayout!
+      navigate('/app/analyze/report', { state: { keyword, result: normalized } })
     } catch (err: any) {
       setError(err.message || 'An error occurred during analysis.')
     } finally {
-      clearInterval(logInterval)
       setIsAnalyzing(false)
     }
   }
@@ -263,11 +231,10 @@ export default function AnalyzePage() {
               </div>
               <textarea
                 ref={textareaRef}
-                className="w-full px-4 py-3 text-sm resize-none min-h-[200px] leading-relaxed"
+                className="w-full px-4 py-3 text-sm h-[360px] sm:h-[400px] lg:h-[440px] overflow-y-auto custom-scroll resize-none leading-relaxed rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] focus:border-[var(--aurora)] focus:outline-none transition-colors"
                 placeholder="Paste your content here..."
                 value={content}
                 onChange={e => setContent(e.target.value)}
-                rows={8}
               />
             </div>
 
@@ -320,15 +287,6 @@ export default function AnalyzePage() {
             </div>
           </motion.div>
         </div>
-        <CompetitorComparisonModal 
-          isOpen={isModalOpen} 
-          onClose={() => setIsModalOpen(false)} 
-          data={result}
-          isLoading={isAnalyzing}
-          error={error}
-          loadingLogs={loadingLogs}
-          userKeyword={keyword}
-        />
       </ContentContainer>
     </PageContainer>
   )

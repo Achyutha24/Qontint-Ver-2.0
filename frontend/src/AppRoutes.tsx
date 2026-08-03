@@ -45,6 +45,7 @@ import DashboardPage from './pages/DashboardPage'
 import SerpIntelPage from './pages/SerpIntelPage'
 import ReportsPage from './pages/ReportsPage'
 import WorkspacePage from './pages/WorkspacePage'
+import AnalyzeReportPage from './pages/AnalyzeReportPage'
 
 export default function AppRoutes() {
   return (
@@ -55,6 +56,12 @@ export default function AppRoutes() {
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+      </Route>
+
+      {/* ── Standalone Dedicated Report Workspace Routes (Outside AppLayout — Unmounts Dashboard & Navbar completely) ── */}
+      <Route element={<DomainGuard />}>
+        <Route path="/app/analyze/report" element={<AnalyzeReportPage />} />
+        <Route path="/app/report/:reportId" element={<AnalyzeReportPage />} />
       </Route>
 
       {/* ── Application workspace routes (protected by DomainGuard) ── */}

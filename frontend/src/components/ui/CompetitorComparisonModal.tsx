@@ -75,8 +75,19 @@ export default function CompetitorComparisonModal({
   useEffect(() => {
     if (isOpen) document.body.style.overflow = 'hidden'
     else document.body.style.overflow = 'unset'
-    return () => { document.body.style.overflow = 'unset' }
-  }, [isOpen])
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.body.style.overflow = 'unset'
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen, onClose])
 
   if (!isOpen) return null
 
@@ -203,33 +214,49 @@ export default function CompetitorComparisonModal({
 
   return (
     <AnimatePresence>
-      {/* Full-screen modal using Qontint theme */}
-      <div className="fixed inset-0 z-[9999] flex flex-col bg-[var(--bg-card)] text-[var(--text-primary)] opacity-100 overflow-hidden">
+      {/* Dedicated Full-Page Enterprise Report Workspace */}
+      <div className="fixed inset-0 z-[100] flex flex-col bg-[var(--bg-void)] text-[var(--text-primary)] opacity-100 overflow-hidden">
 
-        {/* ── Header ─────────────────────────────────────────────────────── */}
+        {/* ── Top Enterprise Workspace Header ───────────────────────────────── */}
         {!isLoading && (
-          <div className="flex-none px-6 py-4 border-b border-[var(--border-subtle)] bg-[var(--bg-depth)] flex items-center justify-between shadow-md relative z-10">
+          <header className="flex-none px-6 py-3.5 border-b border-[var(--border-subtle)] bg-[var(--bg-card)] flex items-center justify-between shadow-sm relative z-20">
             <div className="flex items-center gap-4">
-              <h2 className="text-xl font-display font-bold text-[var(--text-primary)]">Analysis Results</h2>
-              <span className="px-2.5 py-1 rounded bg-[color-mix(in_srgb,var(--aurora)_10%,transparent)] text-[var(--aurora)] border border-[color-mix(in_srgb,var(--aurora)_30%,transparent)] text-xs font-medium font-mono">
-                Completed
-              </span>
-            </div>
-            <div className="flex flex-col text-right">
-              <div className="flex items-center justify-end gap-3 mb-1">
-                <button
-                  onClick={() => window.print()}
-                  className="print-hidden flex items-center gap-2 px-3 py-1.5 rounded border border-[var(--border-subtle)] text-[var(--aurora)] hover:bg-[var(--surface-hover)] transition-colors text-xs font-medium"
-                >
-                  <Download className="w-3.5 h-3.5" /> Download Report
-                </button>
-                <button onClick={onClose} className="print-hidden p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
-                  <X className="w-5 h-5" />
-                </button>
+              <button
+                onClick={onClose}
+                className="flex items-center gap-2 text-xs font-mono text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors px-3 py-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-depth)]"
+              >
+                <ChevronRight className="w-4 h-4 rotate-180 text-[var(--aurora)]" />
+                <span>Back to Search</span>
+              </button>
+
+              <div className="h-5 w-px bg-[var(--border-subtle)]" />
+
+              <div className="flex items-center gap-3">
+                <h1 className="text-lg font-display font-bold text-[var(--text-primary)] tracking-tight">
+                  Neural Content Dissection Audit
+                </h1>
+                <span className="px-2.5 py-0.5 rounded-full bg-[color-mix(in_srgb,var(--aurora)_10%,transparent)] text-[var(--aurora)] border border-[color-mix(in_srgb,var(--aurora)_30%,transparent)] text-[10px] font-bold font-mono uppercase tracking-wider">
+                  Report Complete
+                </span>
               </div>
-              <p className="text-[10px] text-[var(--text-muted)]">Your content has been analyzed against top ranking pages</p>
             </div>
-          </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => window.print()}
+                className="print-hidden flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-depth)] text-[var(--aurora)] hover:bg-[var(--surface-hover)] transition-colors text-xs font-medium shadow-xs"
+              >
+                <Download className="w-4 h-4" /> Download Report
+              </button>
+              <button
+                onClick={onClose}
+                aria-label="Close Report Workspace"
+                className="print-hidden p-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] rounded-xl transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </header>
         )}
 
         <div className="flex-1 overflow-y-auto custom-scroll relative">
@@ -249,29 +276,37 @@ export default function CompetitorComparisonModal({
                 <h3 className="text-xl font-bold text-[var(--text-primary)]">Analysis Failed</h3>
                 <p className="text-[var(--text-secondary)]">{error}</p>
                 <button onClick={onClose} className="mt-4 px-4 py-2 bg-[var(--bg-depth)] text-[var(--text-primary)] rounded-xl border border-[var(--border-subtle)] hover:border-[var(--aurora)] transition-colors">
-                  Close
+                  Close Report
                 </button>
               </motion.div>
             )}
 
-            {/* Dashboard */}
+            {/* Dashboard Workspace */}
             {!isLoading && !error && data && (
               <motion.div
                 key="dashboard"
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="max-w-[1400px] mx-auto p-6 space-y-6"
+                className="max-w-[1536px] mx-auto px-6 py-8 space-y-8"
               >
 
-                {/* ── Score Section ───────────────────────────────────────────── */}
-                <div className="flex flex-col lg:flex-row gap-5 items-stretch">
-                  {/* Keyword card */}
-                  <div className="flex flex-col justify-center w-full lg:w-[220px] bg-[var(--bg-depth)] border border-[var(--border-subtle)] p-5 rounded-2xl flex-shrink-0">
-                    <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest font-mono mb-1">Keyword Analyzed</span>
-                    <h2 className="text-xl font-bold text-[var(--aurora)] line-clamp-3 leading-snug">{keyword}</h2>
+                {/* ── Section 1: Target Keyword & Score Cards ─────────────────────────────── */}
+                <div className="space-y-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
+                    <div>
+                      <span className="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-widest font-bold">Target Query Analyzed</span>
+                      <h2 className="text-2xl font-bold font-display text-[var(--aurora)] leading-tight mt-0.5">{keyword}</h2>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-[var(--text-muted)] bg-[var(--bg-card)] px-3.5 py-2 rounded-xl border border-[var(--border-subtle)]">
+                      <Search className="w-3.5 h-3.5 text-[var(--aurora)]" />
+                      <span>Intent: <strong className="text-[var(--text-primary)]">{searchIntent}</strong></span>
+                      <span className="text-[var(--border-subtle)]">|</span>
+                      <span>Density: <strong className="text-[var(--text-primary)]">{kwDensity}</strong></span>
+                    </div>
                   </div>
-                  {/* Responsive Enterprise KPI Grid: 1 col mobile, 2 tablet, 3 laptop/desktop */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-4 flex-1 w-full">
+
+                  {/* Responsive Enterprise KPI Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
                     <ScoreCard score={overallScore} metricKey="overall" />
                     <ScoreCard score={seoScore} metricKey="seo" />
                     <ScoreCard score={readScore} metricKey="readability" customSubtext={readabilityText} />
@@ -281,18 +316,170 @@ export default function CompetitorComparisonModal({
                   </div>
                 </div>
 
-                {/* ── Top 3 SERP Results ──────────────────────────────────── */}
-                {topCompetitors.length > 0 && (
-                  <div className="card p-5">
-                    <div className="flex items-center justify-between mb-5">
-                      <h3 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
-                        Top 3 Google Search Results <Info className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-                      </h3>
-                      <button className="px-3 py-1.5 rounded border border-[var(--border-subtle)] text-[var(--text-secondary)] text-xs hover:bg-[var(--surface-hover)] transition-colors">
-                        View All SERP Results
-                      </button>
+                {/* ── Section 2: Deep Dissection Grid ──────────────────────────────────────── */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+
+                  {/* Card 1: AI Executive Summary */}
+                  <div className="card p-6 flex flex-col justify-between h-full bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl">
+                    <div>
+                      <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[var(--border-subtle)]">
+                        <div className="w-8 h-8 rounded-lg bg-[color-mix(in_srgb,var(--stellar)_15%,transparent)] text-[var(--stellar)] flex items-center justify-center border border-[color-mix(in_srgb,var(--stellar)_30%,transparent)] shrink-0">
+                          <Lightbulb className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-[var(--text-primary)]">AI Executive Synthesis</h3>
+                          <p className="text-[10px] text-[var(--text-muted)] font-mono">Neural Content Assessment</p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-[var(--text-secondary)] leading-relaxed whitespace-normal break-words">{aiSummary}</p>
                     </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                  </div>
+
+                  {/* Card 2: Content Strengths */}
+                  <div className="card p-6 flex flex-col justify-between h-full bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl">
+                    <div>
+                      <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[var(--border-subtle)]">
+                        <div className="w-8 h-8 rounded-lg bg-[color-mix(in_srgb,var(--aurora)_15%,transparent)] text-[var(--aurora)] flex items-center justify-center border border-[color-mix(in_srgb,var(--aurora)_30%,transparent)] shrink-0">
+                          <CheckCircle className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-[var(--text-primary)]">Competitive Strengths</h3>
+                          <p className="text-[10px] text-[var(--text-muted)] font-mono">{strengths.length} Distinct Advantages</p>
+                        </div>
+                      </div>
+                      <ul className="space-y-3">
+                        {strengths.map((str, i) => (
+                          <li key={i} className="flex items-start gap-2.5 text-xs text-[var(--text-secondary)] leading-snug">
+                            <CheckCircle className="w-4 h-4 text-[var(--aurora)] shrink-0 mt-0.5" />
+                            <span className="whitespace-normal break-words">{str}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Content Weaknesses */}
+                  <div className="card p-6 flex flex-col justify-between h-full bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl">
+                    <div>
+                      <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[var(--border-subtle)]">
+                        <div className="w-8 h-8 rounded-lg bg-[color-mix(in_srgb,var(--solar)_15%,transparent)] text-[var(--solar)] flex items-center justify-center border border-[color-mix(in_srgb,var(--solar)_30%,transparent)] shrink-0">
+                          <AlertTriangle className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-[var(--text-primary)]">Content Gaps & Weaknesses</h3>
+                          <p className="text-[10px] text-[var(--text-muted)] font-mono">{weaknesses.length} Action Items</p>
+                        </div>
+                      </div>
+                      <ul className="space-y-3">
+                        {weaknesses.map((wk, i) => (
+                          <li key={i} className="flex items-start gap-2.5 text-xs text-[var(--text-secondary)] leading-snug">
+                            <AlertTriangle className="w-4 h-4 text-[var(--solar)] shrink-0 mt-0.5" />
+                            <span className="whitespace-normal break-words">{wk}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* ── Section 3: Recommendations & Entity Analysis ────────────────────────────── */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+
+                  {/* Recommendations Card (2 Columns Wide) */}
+                  <div className="lg:col-span-2 card p-6 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--border-subtle)]">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-[color-mix(in_srgb,var(--aurora)_15%,transparent)] text-[var(--aurora)] flex items-center justify-center border border-[color-mix(in_srgb,var(--aurora)_30%,transparent)] shrink-0">
+                            <Rocket className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-bold text-[var(--text-primary)]">Actionable Optimization Blueprint</h3>
+                            <p className="text-[10px] text-[var(--text-muted)] font-mono">Rank Enhancement Recommendations</p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-mono font-bold text-[var(--aurora)] bg-[var(--bg-depth)] px-2.5 py-1 rounded-md border border-[var(--border-subtle)]">
+                          {recommendations.length} Priority Items
+                        </span>
+                      </div>
+
+                      <div className="space-y-3">
+                        {recommendations.map((rec, i) => (
+                          <div key={i} className="p-3.5 rounded-xl bg-[var(--bg-depth)] border border-[var(--border-subtle)] flex items-start gap-3 hover:border-[var(--aurora)]/30 transition-colors">
+                            <span className="w-6 h-6 rounded-lg bg-[var(--aurora)]/10 text-[var(--aurora)] border border-[var(--aurora)]/20 font-mono font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                              #{i + 1}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-[var(--text-primary)] font-medium leading-relaxed whitespace-normal break-words">
+                                {rec}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Keyword & LSI Analysis Card */}
+                  <div className="card p-6 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[var(--border-subtle)]">
+                        <div className="w-8 h-8 rounded-lg bg-[var(--bg-depth)] text-[var(--text-muted)] flex items-center justify-center border border-[var(--border-subtle)] shrink-0">
+                          <Search className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-[var(--text-primary)]">Keyword & Entity Signals</h3>
+                          <p className="text-[10px] text-[var(--text-muted)] font-mono">Semantic Signal Audit</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 mb-5">
+                        {[
+                          { label: 'Primary Keyword', value: keyword },
+                          { label: 'Keyword Density', value: kwDensity },
+                          { label: 'Search Intent', value: searchIntent },
+                          { label: 'Keyword in Title', value: 'Yes' },
+                          { label: 'In Meta Description', value: 'Yes' },
+                          { label: 'In Heading (H1)', value: 'Yes' },
+                        ].map(({ label, value }) => (
+                          <div key={label} className="flex justify-between items-center pb-2 border-b border-[var(--border-subtle)] text-xs">
+                            <span className="text-[var(--text-muted)] font-mono">{label}</span>
+                            <span className="font-semibold text-[var(--text-primary)] truncate max-w-[160px] text-right">{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider block mb-2 font-bold">LSI & Entity Keywords</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {lsiKeywords.map((lsi, i) => (
+                          <span key={i} className="px-2 py-1 text-[10px] font-mono bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-md text-[var(--text-secondary)]">
+                            {lsi}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* ── Section 4: Top 3 SERP Results ──────────────────────────────────── */}
+                {topCompetitors.length > 0 && (
+                  <div className="card p-6 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl space-y-5">
+                    <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-[var(--bg-depth)] text-[var(--aurora)] flex items-center justify-center border border-[var(--border-subtle)] shrink-0">
+                          <BarChart2 className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-[var(--text-primary)]">Top 3 Google Search Competitors</h3>
+                          <p className="text-[10px] text-[var(--text-muted)] font-mono">SERP Baseline Comparison</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                       {topCompetitors.map((comp: any, idx: number) => {
                         let hostname = comp.domain || ''
                         if (!hostname && comp.url) {
@@ -300,31 +487,31 @@ export default function CompetitorComparisonModal({
                         }
                         const compSeoScore = toScore100(comp.seo_score, 0)
                         return (
-                          <div key={idx} className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl p-4 flex flex-col relative overflow-hidden group">
+                          <div key={idx} className="bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-xl p-5 flex flex-col relative overflow-hidden group hover:border-[var(--aurora)]/30 transition-colors">
                             {/* Position badge */}
                             <div className="absolute top-4 left-4 w-6 h-6 rounded-full bg-[color-mix(in_srgb,var(--stellar)_20%,transparent)] border border-[color-mix(in_srgb,var(--stellar)_50%,transparent)] text-[var(--stellar)] font-bold flex items-center justify-center text-xs">
-                              {comp.position || idx + 1}
+                              #{comp.position || idx + 1}
                             </div>
                             <div className="ml-10 flex items-center gap-2 mb-2">
                               {comp.favicon
                                 ? <img src={comp.favicon} alt="" className="w-4 h-4 rounded" />
-                                : <div className="w-4 h-4 rounded bg-[var(--bg-depth)]" />
+                                : <div className="w-4 h-4 rounded bg-[var(--bg-card)]" />
                               }
-                              <span className="text-xs text-[var(--text-muted)] truncate">{hostname}</span>
+                              <span className="text-xs text-[var(--text-muted)] font-mono truncate">{hostname}</span>
                             </div>
                             <a href={comp.url} target="_blank" rel="noopener noreferrer"
                               className="text-[var(--aurora)] font-bold text-sm line-clamp-2 mb-1 hover:underline cursor-pointer block">
                               {comp.title || 'Untitled Result'}
                             </a>
                             <a href={comp.url} target="_blank" rel="noopener noreferrer"
-                              className="text-[var(--aurora)] text-[10px] truncate mb-3 hover:underline block">
+                              className="text-[var(--aurora)] text-[10px] truncate mb-3 hover:underline block font-mono">
                               {comp.url}
                             </a>
-                            <p className="text-xs text-[var(--text-secondary)] line-clamp-3 mb-4 flex-1">
+                            <p className="text-xs text-[var(--text-secondary)] line-clamp-3 mb-4 flex-1 leading-relaxed">
                               {comp.meta_description || comp.snippet || 'No description provided by the search engine.'}
                             </p>
                             <div className="flex items-center justify-between mt-auto pt-4 border-t border-[var(--border-subtle)]">
-                              <div className="flex items-center gap-5">
+                              <div className="flex items-center gap-4">
                                 <StatMini value={comp.word_count || 0} label="Words" />
                                 <StatMini value={comp.read_time || '0 min'} label="Read Time" />
                                 <StatMini value={comp.authority || 0} label="Authority" />
@@ -335,9 +522,9 @@ export default function CompetitorComparisonModal({
                               </div>
                               <button
                                 onClick={() => setSelectedCompetitor({ ...comp, idx })}
-                                className="print-hidden px-3 py-1.5 rounded border border-[var(--border-subtle)] text-[var(--aurora)] text-xs hover:bg-[var(--surface-hover)] transition-colors ml-4 whitespace-nowrap"
+                                className="print-hidden px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--aurora)] text-xs font-medium hover:bg-[var(--surface-hover)] transition-colors ml-2 whitespace-nowrap"
                               >
-                                View Details
+                                Details
                               </button>
                             </div>
                           </div>
@@ -352,7 +539,7 @@ export default function CompetitorComparisonModal({
                   {selectedCompetitor && (
                     <motion.div
                       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                      className="fixed inset-0 z-[99999] bg-[#0F172A]/40 backdrop-blur-md flex items-center justify-center p-4 print-hidden"
+                      className="fixed inset-0 z-[100000] bg-[#0F172A]/50 backdrop-blur-md flex items-center justify-center p-4 print-hidden"
                     >
                       <motion.div
                         initial={{ y: 50, scale: 0.95 }} animate={{ y: 0, scale: 1 }} exit={{ y: 50, scale: 0.95 }}
@@ -361,7 +548,7 @@ export default function CompetitorComparisonModal({
                         <div className="sticky top-0 bg-[var(--bg-depth)]/90 backdrop-blur border-b border-[var(--border-subtle)] p-4 flex items-center justify-between z-10">
                           <h3 className="text-lg font-bold text-[var(--text-primary)] flex items-center gap-2">
                             <span className="w-6 h-6 rounded-full bg-[color-mix(in_srgb,var(--stellar)_20%,transparent)] text-[var(--stellar)] flex items-center justify-center text-xs border border-[color-mix(in_srgb,var(--stellar)_50%,transparent)]">
-                              {selectedCompetitor.idx + 1}
+                              #{selectedCompetitor.idx + 1}
                             </span>
                             Competitor Analysis
                           </h3>
@@ -397,120 +584,6 @@ export default function CompetitorComparisonModal({
                     </motion.div>
                   )}
                 </AnimatePresence>
-
-                {/* ── Analysis Grid ───────────────────────────────────────── */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-                  {/* Column 1: AI Summary + Strengths */}
-                  <div className="flex flex-col gap-6">
-                    <div className="card p-5 flex-1">
-                      <h3 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 mb-3">
-                        <Lightbulb className="w-4 h-4 text-[var(--stellar)]" /> AI Summary
-                      </h3>
-                      <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{aiSummary}</p>
-                    </div>
-
-                    <div className="card p-5 flex-1">
-                      <h3 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 mb-4">
-                        <CheckCircle className="w-4 h-4 text-[var(--aurora)]" /> Content Strengths
-                      </h3>
-                      <ul className="space-y-3">
-                        {strengths.map((str, i) => (
-                          <li key={i} className="flex items-start gap-2 text-xs text-[var(--text-secondary)]">
-                            <CheckCircle className="w-3.5 h-3.5 text-[var(--aurora)] shrink-0 mt-0.5" />
-                            <span>{str}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-
-                  {/* Column 2: Weaknesses + Recommendations */}
-                  <div className="flex flex-col gap-6">
-                    <div className="card p-5 flex-1">
-                      <h3 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 mb-4">
-                        <AlertTriangle className="w-4 h-4 text-[var(--solar)]" /> Content Weaknesses
-                      </h3>
-                      <ul className="space-y-3">
-                        {weaknesses.map((wk, i) => (
-                          <li key={i} className="flex items-start gap-2 text-xs text-[var(--text-secondary)]">
-                            <X className="w-3.5 h-3.5 text-[var(--solar)] shrink-0 mt-0.5" />
-                            <span>{wk}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div className="card p-5 flex-1">
-                      <h3 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 mb-4">
-                        <Lightbulb className="w-4 h-4 text-[var(--stellar)]" /> Recommendations
-                      </h3>
-                      <ul className="space-y-3">
-                        {recommendations.map((rec, i) => (
-                          <li key={i} className="flex items-start gap-2 text-xs text-[var(--text-secondary)]">
-                            <ChevronRight className="w-3.5 h-3.5 text-[var(--stellar)] shrink-0 mt-0.5" />
-                            <span>{rec}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-
-                  {/* Column 3: Keyword Analysis */}
-                  <div className="card p-5 flex flex-col h-full">
-                    <h3 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 mb-6">
-                      <Search className="w-4 h-4 text-[var(--text-muted)]" /> Keyword Analysis
-                    </h3>
-
-                    <div className="space-y-4 mb-6">
-                      {[
-                        { label: 'Primary Keyword',   value: keyword },
-                        { label: 'Keyword Density',   value: kwDensity },
-                        { label: 'Search Intent',     value: searchIntent },
-                        { label: 'Keyword in Title',  value: 'Yes' },
-                        { label: 'In Meta Description', value: 'Yes' },
-                        { label: 'In Heading (H1)',   value: 'Yes' },
-                      ].map(({ label, value }) => (
-                        <div key={label} className="flex justify-between items-center pb-2 border-b border-[var(--border-subtle)]">
-                          <span className="text-xs text-[var(--text-muted)]">{label}</span>
-                          <span className="text-xs text-[var(--text-primary)] font-semibold">{value}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="mt-auto">
-                      <span className="text-xs text-[var(--text-muted)] block mb-3">LSI Keywords</span>
-                      <div className="flex flex-wrap gap-2">
-                        {lsiKeywords.length > 0
-                          ? lsiKeywords.map((lsi, i) => (
-                              <span key={i} className="tag">{lsi}</span>
-                            ))
-                          : <span className="text-xs text-[var(--text-muted)] italic">Collecting from SERP…</span>
-                        }
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* ── Quick Actions ────────────────────────────────────────── */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 pb-8">
-                  {[
-                    { title: 'SERP Comparison',  sub: 'Compare your content with top ranking pages', icon: BarChart2,     color: 'text-[var(--aurora)]',  bg: 'bg-[color-mix(in_srgb,var(--aurora)_10%,transparent)]' },
-                    { title: 'Entity Analysis',  sub: 'View detected entities and semantic coverage',   icon: Box,          color: 'text-[var(--aurora)]',  bg: 'bg-[color-mix(in_srgb,var(--aurora)_10%,transparent)]' },
-                    { title: 'Novelty Analysis', sub: 'Analyze content originality and uniqueness',     icon: Rocket,       color: 'text-[var(--stellar)]', bg: 'bg-[color-mix(in_srgb,var(--stellar)_10%,transparent)]' },
-                    { title: 'Detailed Feedback', sub: 'Get in-depth AI feedback and suggestions',      icon: MessageSquare, color: 'text-[var(--plasma)]', bg: 'bg-[color-mix(in_srgb,var(--plasma)_10%,transparent)]' },
-                  ].map((btn, i) => (
-                    <button key={i} className="card hover:border-[var(--border-medium)] p-4 flex flex-col md:flex-row items-start md:items-center gap-4 transition-all text-left group">
-                      <div className={`w-10 h-10 rounded-lg ${btn.bg} ${btn.color} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}>
-                        <btn.icon className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-0.5">{btn.title}</h4>
-                        <p className="text-[10px] text-[var(--text-muted)] leading-tight">{btn.sub}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
 
               </motion.div>
             )}
