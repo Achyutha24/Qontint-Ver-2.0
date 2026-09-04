@@ -70,7 +70,8 @@ def _build_summary(
     domains_str = _join_list(top_domains[:3], "and")
 
     reading_level = data.get("readability", {}).get("average_reading_level", "professional level")
-    complexity = data.get("readability", {}).get("complexity", "moderate").lower()
+    complexity_val = data.get("readability", {}).get("complexity", "moderate")
+    complexity = str(complexity_val).lower() if isinstance(complexity_val, str) else "moderate"
 
     paragraphs.append(
         f"The SERP landscape for \"{keyword}\" is dominated by {page_count} authoritative sources, "

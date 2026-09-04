@@ -1,6 +1,4 @@
-import { useLocation, Link } from 'react-router-dom'
-import { ChevronRight, Home, Briefcase } from 'lucide-react'
-import { useDomain } from '../../context/DomainContext'
+import { useLocation } from 'react-router-dom'
 
 const ROUTE_LABELS: Record<string, string> = {
   '/app/dashboard': 'Dashboard',
@@ -8,63 +6,27 @@ const ROUTE_LABELS: Record<string, string> = {
   '/app/generate': 'AI Content Studio',
   '/app/intelligence': 'Query Intelligence',
   '/app/serp-intel': 'SERP Intelligence',
-  '/app/graph': 'Knowledge Graph',
+  '/app/graph': 'ERP Graph',
   '/app/reports': 'Executive Reports',
+
   '/app/workspace': 'Workspace Hub',
   '/app/youtube': 'YouTube Intelligence',
   '/app/keywords': 'Keywords Explorer',
+  '/app/settings': 'Settings',
+  '/app/help': 'Help & Docs',
+  '/app/about': 'About Qontint',
 }
 
 export default function Breadcrumbs() {
   const location = useLocation()
-  const { activeDomainName } = useDomain()
+  const pageLabel = ROUTE_LABELS[location.pathname] || 'Overview'
 
-  const currentPath = location.pathname
-  const pageLabel = ROUTE_LABELS[currentPath] || 'Overview'
-
-  // Retrieve last analyzed keyword from localStorage if available
-  let activeKeyword: string | null = null
-  try {
-    const raw = localStorage.getItem('qontint_last_analysis')
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      if (parsed.keyword) activeKeyword = parsed.keyword
-    }
-  } catch (_) {}
-
+  // Keep the breadcrumb intentionally minimal. Workspace/domain and keyword
+  // context already appear elsewhere on the page and should not be repeated
+  // as navigation crumbs.
   return (
-    <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] font-mono py-1 overflow-x-auto">
-      <Link
-        to="/app/dashboard"
-        className="flex items-center gap-1 hover:text-[var(--aurora)] transition-colors no-underline text-[var(--text-muted)]"
-      >
-        <Home size={12} />
-      </Link>
-
-      <ChevronRight size={12} className="opacity-40 flex-shrink-0" />
-
-      <Link
-        to="/app/workspace"
-        className="flex items-center gap-1 hover:text-[var(--aurora)] transition-colors no-underline text-[var(--text-muted)] truncate max-w-[140px]"
-      >
-        <Briefcase size={12} />
-        <span className="truncate">{activeDomainName}</span>
-      </Link>
-
-      <ChevronRight size={12} className="opacity-40 flex-shrink-0" />
-
-      <span className="font-semibold text-[var(--text-primary)] whitespace-nowrap">
-        {pageLabel}
-      </span>
-
-      {activeKeyword && (currentPath.includes('analyze') || currentPath.includes('reports') || currentPath.includes('graph')) && (
-        <>
-          <ChevronRight size={12} className="opacity-40 flex-shrink-0" />
-          <span className="text-[var(--aurora)] truncate max-w-[180px]">
-            "{activeKeyword}"
-          </span>
-        </>
-      )}
+    <nav aria-label="Breadcrumb" className="flex items-center text-xs text-[var(--text-muted)] font-mono py-1">
+      <span className="font-semibold text-[var(--text-primary)] whitespace-nowrap">{pageLabel}</span>
     </nav>
   )
 }

@@ -293,3 +293,72 @@ tr:hover td {
     display: none !important;
   }
 }
+
+/* ── Qontint v2.4 visual refinement ─────────────────────────────────────── */
+:root {
+  --accent-blue: #2563EB;
+  --accent-teal: #0F766E;
+  --accent-blue-soft: #EFF6FF;
+  --accent-teal-soft: #F0FDFA;
+}
+
+body {
+  background-image:
+    radial-gradient(circle at 8% 8%, rgba(37, 99, 235, 0.035), transparent 28%),
+    radial-gradient(circle at 92% 14%, rgba(249, 115, 22, 0.045), transparent 30%);
+  background-attachment: fixed;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+
+.card {
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.045);
+}
+
+.card:hover {
+  box-shadow: 0 7px 18px rgba(15, 23, 42, 0.07);
+}
+
+/* ── Qontint v2.4 page hierarchy & enterprise polish ── */
+.page-header {
+  position: relative;
+}
+
+.page-header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 72px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--aurora);
+}
+
+.page-header h1 {
+  text-wrap: balance;
+}
+
+.card {
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.045);
+}
+
+.card:hover {
+  box-shadow: 0 7px 18px rgba(15, 23, 42, 0.065);
+}
+
+button, a, input, textarea, select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid rgba(249, 115, 22, 0.65);
+  outline-offset: 2px;
+}

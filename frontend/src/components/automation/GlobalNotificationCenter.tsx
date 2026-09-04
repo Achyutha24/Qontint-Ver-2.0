@@ -33,8 +33,9 @@ export default function GlobalNotificationCenter() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([
     { id: 'n1', title: 'SERP Scan Complete', subtitle: 'Payment Gateway Security API ranked #2 in SERP Intel', time: '10 mins ago', read: false, type: 'success', route: '/app/serp-intel' },
     { id: 'n2', title: 'Executive Audit Report Ready', subtitle: 'B2B SaaS Production PDF generated (Grade A+)', time: '45 mins ago', read: false, type: 'info', route: '/app/reports' },
-    { id: 'n3', title: 'Knowledge Graph Refreshed', subtitle: 'Indexed 199 nodes and 5,488 relationships', time: '3 hours ago', read: true, type: 'success', route: '/app/graph' },
-    { id: 'n4', title: 'Action Required: Schema Missing', subtitle: 'OAuth 2.0 B2B Security requires FAQPage schema', time: '5 hours ago', read: false, type: 'warning', route: '/app/generate' },
+    { id: 'n3', title: 'ERP Graph Refreshed', subtitle: 'Indexed 55+ ERP platforms, modules, and process relationships', time: '3 hours ago', read: true, type: 'success', route: '/app/graph' },
+    { id: 'n4', title: 'Action Required: Schema Missing', subtitle: 'ERP Cloud Architecture requires FAQPage schema', time: '5 hours ago', read: false, type: 'warning', route: '/app/generate' },
+
   ])
 
   const unreadCount = notifications.filter(n => !n.read).length

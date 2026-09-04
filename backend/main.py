@@ -17,6 +17,14 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+import sys
+
+# Playwright launches a Chromium subprocess. On Windows this requires the
+# Proactor event loop; SelectorEventLoop raises NotImplementedError from
+# asyncio.create_subprocess_exec(). Set the policy before Uvicorn creates
+# the application loop.
+if sys.platform == "win32" and hasattr(asyncio, "WindowsProactorEventLoopPolicy"):
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends, Request

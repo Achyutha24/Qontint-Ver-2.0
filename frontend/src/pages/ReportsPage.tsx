@@ -260,7 +260,9 @@ export default function ReportsPage() {
 
       if (activeCategoryTab === 'Favorites') return matchesSearch && r.isFavorite && !r.isArchived
       if (activeCategoryTab === 'Archived') return matchesSearch && r.isArchived
+      if (activeCategoryTab === 'ERP Graph') return matchesSearch && (r.type === 'ERP Graph' || r.type === 'Knowledge Graph') && !r.isArchived
       if (activeCategoryTab !== 'All') return matchesSearch && r.type === activeCategoryTab && !r.isArchived
+
 
       return matchesSearch && !r.isArchived
     }).sort((a, b) => {
@@ -278,11 +280,12 @@ export default function ReportsPage() {
       analyze: repository.filter(r => r.type === 'Analyze').length,
       generate: repository.filter(r => r.type === 'Generated Content').length,
       serp: repository.filter(r => r.type === 'SERP Intelligence').length,
-      graph: repository.filter(r => r.type === 'Knowledge Graph').length,
+      graph: repository.filter(r => r.type === 'Knowledge Graph' || r.type === 'ERP Graph').length,
       favorites: repository.filter(r => r.isFavorite).length,
       archived: repository.filter(r => r.isArchived).length
     }
   }, [repository])
+
 
   const filteredHistory = useMemo(() => {
     return repository.filter(r =>
@@ -382,7 +385,7 @@ export default function ReportsPage() {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           {/* Category Switcher Tabs */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-            {['All', 'Analyze', 'Generated Content', 'SERP Intelligence', 'Knowledge Graph', 'Favorites', 'Archived'].map(cat => (
+            {['All', 'Analyze', 'Generated Content', 'SERP Intelligence', 'ERP Graph', 'Favorites', 'Archived'].map(cat => (
               <button
                 key={cat}
                 onClick={() => setActiveCategoryTab(cat)}
@@ -395,6 +398,7 @@ export default function ReportsPage() {
                 {cat}
               </button>
             ))}
+
           </div>
 
           {/* Search & Sort Controls */}
@@ -449,8 +453,9 @@ export default function ReportsPage() {
                   {report.type === 'Analyze' && <Cpu size={20} />}
                   {report.type === 'Generated Content' && <Zap size={20} />}
                   {report.type === 'SERP Intelligence' && <Globe size={20} />}
-                  {report.type === 'Knowledge Graph' && <Network size={20} />}
+                  {(report.type === 'Knowledge Graph' || report.type === 'ERP Graph') && <Network size={20} />}
                   {report.type === 'Workspace' && <FileText size={20} />}
+
                 </div>
 
                 <div className="space-y-1 flex-1">
@@ -902,36 +907,37 @@ export default function ReportsPage() {
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────────── */}
-      {/* SECTION 7: KNOWLEDGE GRAPH INSIGHTS EXECUTIVE SUMMARY                   */}
+      {/* SECTION 7: ERP GRAPH INSIGHTS EXECUTIVE SUMMARY                         */}
       {/* ─────────────────────────────────────────────────────────────────────── */}
       <div className="card p-6 border border-[var(--border-subtle)] bg-[var(--bg-card)] shadow-xs relative z-10 space-y-4">
         <h3 className="text-lg font-bold text-[var(--text-primary)] flex items-center gap-2">
-          <Network size={18} className="text-[var(--aurora)]" /> Section 7: Knowledge Graph Intelligence Insights
+          <Network size={18} className="text-[var(--aurora)]" /> Section 7: ERP Graph Intelligence Insights
         </h3>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
           <div className="p-3 bg-[var(--bg-depth)] rounded-xl border border-[var(--border-subtle)]">
-            <span className="text-[10px] text-[var(--text-muted)] block uppercase">Most Connected Entity</span>
-            <strong className="text-[var(--aurora)] text-sm">Payment Gateway API</strong>
+            <span className="text-[10px] text-[var(--text-muted)] block uppercase">Most Connected Hub</span>
+            <strong className="text-[var(--aurora)] text-sm">SAP S/4HANA</strong>
           </div>
           <div className="p-3 bg-[var(--bg-depth)] rounded-xl border border-[var(--border-subtle)]">
-            <span className="text-[10px] text-[var(--text-muted)] block uppercase">Strongest Cluster</span>
-            <strong className="text-emerald-600 text-sm">OAuth 2.0 Auth Core</strong>
+            <span className="text-[10px] text-[var(--text-muted)] block uppercase">Dominant Cluster</span>
+            <strong className="text-emerald-600 text-sm">Core Financials &amp; P2P</strong>
           </div>
           <div className="p-3 bg-[var(--bg-depth)] rounded-xl border border-[var(--border-subtle)]">
             <span className="text-[10px] text-[var(--text-muted)] block uppercase">Weakest Cluster</span>
-            <strong className="text-amber-500 text-sm">PCI DSS Compliance</strong>
+            <strong className="text-amber-500 text-sm">Legacy MES Connectors</strong>
           </div>
           <div className="p-3 bg-[var(--bg-depth)] rounded-xl border border-[var(--border-subtle)]">
             <span className="text-[10px] text-[var(--text-muted)] block uppercase">Relationship Density</span>
-            <strong className="text-blue-600 text-sm">27.6 links / node</strong>
+            <strong className="text-blue-600 text-sm">2.4 edges / node</strong>
           </div>
         </div>
 
         <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-          AI Graph Analysis reveals strong topical authority around payment gateway architectures. Incorporating PCI DSS compliance nodes will balance the authority distribution across all 4 core enterprise clusters.
+          ERP Graph Analysis reveals dense semantic authority across core enterprise finance, procure-to-pay (P2P), and order-to-cash (O2C) architectures. Expanding automated warehouse and bank reconciliation integration nodes establishes full end-to-end supply chain visibility.
         </p>
       </div>
+
 
       {/* ─────────────────────────────────────────────────────────────────────── */}
       {/* SECTION 8: VISUAL ANALYTICS (RECHARTS GRAPHS)                          */}

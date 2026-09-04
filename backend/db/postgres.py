@@ -4,6 +4,7 @@ PostgreSQL async connection pool using SQLAlchemy + asyncpg.
 from __future__ import annotations
 
 import logging
+import os
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import (
@@ -17,6 +18,13 @@ from sqlalchemy.pool import NullPool
 from config import settings
 
 logger = logging.getLogger(__name__)
+
+# Ensure data directory exists if using SQLite relative path
+if "sqlite" in settings.DATABASE_URL:
+    db_path = settings.DATABASE_URL.split(":///")[-1]
+    db_dir = os.path.dirname(os.path.abspath(db_path))
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
 
 # ── Engine ────────────────────────────────────────────────────────────────────
 engine: AsyncEngine = create_async_engine(
@@ -49,14 +57,21 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
-# ── Health check ──────────────────────────────────────────────────────────────
+# ── Health check & Initialization ─────────────────────────────────────────────
+async def init_db():
+    """Create tables if using SQLite / development database."""
+    from models.db import Base
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+
 async def check_db_health() -> bool:
-    """Return True if PostgreSQL is reachable."""
+    """Return True if PostgreSQL/SQLite is reachable."""
     try:
         from sqlalchemy import text
         async with AsyncSessionLocal() as session:
             await session.execute(text("SELECT 1"))
         return True
     except Exception as exc:
-        logger.error("PostgreSQL health check failed: %s", exc)
+        logger.error("Database health check failed: %s", exc)
         return False

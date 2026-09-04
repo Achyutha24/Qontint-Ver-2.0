@@ -9,22 +9,26 @@ from db.postgres import get_db
 
 router = APIRouter(prefix="/api/v1/graph", tags=["Graph"])
 
+# ERP Graph Version
+ERP_GRAPH_VERSION = "erp-v1"
+
 # Global cache for graph snapshots
 GRAPH_CACHE = {}
 
 @router.post("/build", response_model=GraphBuildResponse)
 async def build_graph(req: GraphBuildRequest, db: AsyncSession = Depends(get_db)):
-    if req.vertical in GRAPH_CACHE:
-        del GRAPH_CACHE[req.vertical]
-    return GraphBuildResponse(job_id="dummy", status="done", message="Graph built")
+    key = f"{ERP_GRAPH_VERSION}_{req.vertical}"
+    if key in GRAPH_CACHE:
+        del GRAPH_CACHE[key]
+    return GraphBuildResponse(job_id="dummy", status="done", message="ERP Graph built")
 
 @router.post("/invalidate/{vertical}")
 async def invalidate_graph_cache(vertical: str):
     """Invalidate the graph cache for a specific vertical after analysis."""
-    keys_to_delete = [k for k in GRAPH_CACHE.keys() if k.startswith(f"{vertical}_")]
+    keys_to_delete = [k for k in GRAPH_CACHE.keys() if vertical in k]
     for k in keys_to_delete:
         del GRAPH_CACHE[k]
-    return {"status": "success", "message": f"Cache invalidated for {vertical}"}
+    return {"status": "success", "message": f"ERP Graph cache invalidated for {vertical}", "version": ERP_GRAPH_VERSION}
 
 @router.get("/authority/top", response_model=AuthorityTopResponse)
 async def get_top_authority(vertical: str, limit: int = 20):
@@ -33,8 +37,8 @@ async def get_top_authority(vertical: str, limit: int = 20):
 
 @router.get("/snapshot/{vertical}")
 async def get_graph_snapshot(vertical: str, request: Request, response: Response, limit: int = 200):
-    """Return nodes and edges for the 3D graph visualization with ETag caching."""
-    cache_key = f"{vertical}_{limit}"
+    """Return nodes and edges for the ERP graph visualization with ETag caching."""
+    cache_key = f"{ERP_GRAPH_VERSION}_{vertical}_{limit}"
     
     try:
         if cache_key in GRAPH_CACHE:
@@ -45,6 +49,7 @@ async def get_graph_snapshot(vertical: str, request: Request, response: Response
             
         data_str = json.dumps(data, sort_keys=True)
         etag = hashlib.md5(data_str.encode('utf-8')).hexdigest()
+
         
         if request.headers.get("If-None-Match") == etag:
             return Response(status_code=304)

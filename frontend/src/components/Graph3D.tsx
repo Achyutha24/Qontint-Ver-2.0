@@ -63,15 +63,18 @@ function getNodeColor(typeStr: string | undefined, overlayMode?: string, authori
   }
 
   const type = (typeStr || '').toUpperCase()
-  if (type.includes('PRODUCT') || type.includes('SERVICE')) return '#F97316'
-  if (type.includes('TECH')) return '#2563EB'
-  if (type.includes('ORG') || type.includes('COMPANY')) return '#22C55E'
-  if (type.includes('PERSON') || type.includes('AUTHOR')) return '#7C3AED'
-  if (type.includes('CONCEPT') || type.includes('TOPIC')) return '#EF4444'
-  if (type.includes('PROCESS') || type.includes('METHOD')) return '#06B6D4'
-  if (type.includes('STANDARD') || type.includes('METRIC')) return '#F59E0B'
+  if (type.includes('PLATFORM')) return '#F97316' // Aurora Orange
+  if (type.includes('MODULE')) return '#2563EB' // Royal Blue
+  if (type.includes('PROCESS')) return '#06B6D4' // Cyan
+  if (type.includes('TECH')) return '#8B5CF6' // Purple
+  if (type.includes('SEC') || type.includes('GOV')) return '#EF4444' // Red
+  if (type.includes('INT')) return '#10B981' // Emerald Green
+  if (type.includes('IMPL') || type.includes('MIG')) return '#F59E0B' // Amber
+  if (type.includes('VENDOR') || type.includes('ORG')) return '#64748B' // Slate Gray
+  if (type.includes('PRODUCT')) return '#F97316'
   return '#64748B'
 }
+
 
 // ── GPU INSTANCED MESH GRAPH SCENE ─────────────────────────────────────────────
 function GraphScene({ nodes, edges, onNodeHover, onNodeClick, selectedId, overlayMode = 'all', isInteracting }: Props & { isInteracting: boolean }) {
@@ -136,7 +139,7 @@ function GraphScene({ nodes, edges, onNodeHover, onNodeClick, selectedId, overla
       })
     }
     return { edgePositions: pos, edgeColors: col }
-  }, [edgeCount, nodeCount])
+  }, [edges, positions])
 
   // ── GPU INSTANCE MATRIX & COLOR UPDATE ──────────────────────────────────────
   // Executes ONLY when dataset, selection, or overlayMode changes!
@@ -341,7 +344,9 @@ export default React.memo(function Graph3D(props: Props) {
     >
       <Canvas
         camera={{ position: [0, 45, 110], fov: 45 }}
-        gl={{ antialias: true, powerPreference: "high-performance" }}
+        frameloop="demand"
+        dpr={[1, 1.25]}
+        gl={{ antialias: false, powerPreference: "high-performance", preserveDrawingBuffer: false }}
       >
         <GraphScene {...props} isInteracting={isInteracting} />
       </Canvas>

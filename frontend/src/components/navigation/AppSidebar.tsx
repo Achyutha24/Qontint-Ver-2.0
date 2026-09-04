@@ -28,7 +28,7 @@ const MAIN_NAV = [
   { to: '/app/generate',     label: 'Generate',           icon: Zap },
   { to: '/app/intelligence', label: 'Intelligence',       icon: Brain },
   { to: '/app/serp-intel',   label: 'SERP Intelligence',  icon: Globe },
-  { to: '/app/graph',        label: 'Knowledge Graph',    icon: Network },
+  { to: '/app/graph',        label: 'ERP Graph',          icon: Network },
   { to: '/app/reports',      label: 'Reports',            icon: FileText },
   { to: '/app/workspace',    label: 'Workspace',          icon: Briefcase },
   { to: '/app/youtube',      label: 'YouTube',            icon: Video },
@@ -36,16 +36,17 @@ const MAIN_NAV = [
 ]
 
 const RECENT_ITEMS = [
-  { label: 'Payment Gateway Security API', icon: Clock,       route: '/app/analyze',   type: 'Analysis' },
-  { label: 'OAuth 2.0 B2B Security',       icon: FolderOpen,  route: '/app/workspace', type: 'Project' },
+  { label: 'ERP System Architecture',      icon: FolderOpen,  route: '/app/graph',     type: 'Graph' },
+  { label: 'Cloud ERP Procurement Audit',  icon: Clock,       route: '/app/analyze',   type: 'Analysis' },
   { label: 'Grade A+ Executive Report',    icon: FileText,    route: '/app/reports',   type: 'Report' },
-  { label: 'Fintech SERP Scan',            icon: TrendingUp,  route: '/app/serp-intel',type: 'SERP' },
+  { label: 'Enterprise SERP Scan',         icon: TrendingUp,  route: '/app/serp-intel',type: 'SERP' },
 ]
 
+
 const TOOLS = [
-  { label: 'Settings',      icon: Settings,    route: null },
-  { label: 'Help & Docs',   icon: HelpCircle,  route: null },
-  { label: 'About Qontint', icon: Info,        route: null },
+  { label: 'Settings',      icon: Settings,    route: '/app/settings' },
+  { label: 'Help & Docs',   icon: HelpCircle,  route: '/app/help' },
+  { label: 'About Qontint', icon: Info,        route: '/app/about' },
 ]
 
 export default function AppSidebar() {
@@ -180,14 +181,22 @@ export default function AppSidebar() {
                   Tools
                 </p>
                 <div className="space-y-0.5">
-                  {TOOLS.map((tool, i) => (
-                    <button
-                      key={i}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-depth)] transition-colors"
+                  {TOOLS.map((tool) => (
+                    <NavLink
+                      key={tool.route}
+                      to={tool.route}
+                      onClick={closeSidebar}
+                      className={({ isActive }) =>
+                        `w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-left ${
+                          isActive
+                            ? 'bg-[var(--solar)] text-[var(--aurora)] border border-[var(--aurora)]/20'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-depth)] border border-transparent'
+                        }`
+                      }
                     >
                       <tool.icon className="w-4 h-4 flex-shrink-0" />
                       <span>{tool.label}</span>
-                    </button>
+                    </NavLink>
                   ))}
                 </div>
               </div>

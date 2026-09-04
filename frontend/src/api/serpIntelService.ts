@@ -24,16 +24,22 @@ export interface SerpResult {
   url: string
   domain: string
   meta_description: string
-  word_count: number
-  estimated_read_time_min: number
-  local_seo_score: number
+  word_count: number | null
+  estimated_read_time_min: number | null
+  local_seo_score: number | null
   publish_date: string | null
   favicon: string
+  extraction_status?: string
+  is_extraction_failed?: boolean
+  extraction_reason?: string | null
+  manual_content?: boolean
+  serp_refreshed_at?: string
 }
 
 export interface SerpIntelResponse {
   keyword: string
-  generated_at: string
+  generated_at: string | null
+  serp_refreshed_at: string | null
   processing_time_ms: number
   is_cached?: boolean
   serp_results: SerpResult[]
@@ -136,6 +142,11 @@ export interface SerpIntelResponse {
       actionable_opportunities: string[]
     }
     summary: string
+    competitor_profiles?: any[]
+    semantic_baseline?: any
+    information_gain?: any
+    advanced_stats?: any
+    graph_data?: any
   }
 }
 
@@ -143,15 +154,15 @@ export interface SerpIntelResponse {
 
 function defaultAnalysis(keyword: string): SerpIntelResponse['analysis'] {
   return {
-    overall_score: { score: 75, label: 'Competitive', breakdown: { search_intent_match: 75, semantic_coverage: 75, entity_richness: 70, seo_quality: 75 } },
+    overall_score: { score: 0, label: 'Not available', breakdown: { search_intent_match: 0, semantic_coverage: 0, entity_richness: 0, seo_quality: 0 } },
     search_intent: { primary_intent: 'Informational', confidence: 0.8, reasoning: 'Based on SERP analysis.', user_expectations: [], ranking_factors: [] },
     serp_features: { detected: [], missing: [], impact_summary: 'No SERP feature data available.' },
-    content_structure: { average_word_count: 1500, average_h1: 1, average_h2: 5, average_h3: 3, uses_lists: true, uses_tables: false, uses_images: true, uses_faq: false, formatting_style: 'Standard', content_flow: 'Standard', insights: [] },
+    content_structure: { average_word_count: 0, average_h1: 0, average_h2: 0, average_h3: 0, uses_lists: false, uses_tables: false, uses_images: false, uses_faq: false, formatting_style: 'Not available', content_flow: 'Not available', insights: [] },
     topic_coverage: { main_topics: [], subtopics: [], examples_used: [], case_studies: false, tutorials: false, depth_rating: 'Moderate', weak_areas: [], strengths: [] },
     keyword_analysis: { primary_keyword: keyword, secondary_keywords: [], long_tail_keywords: [], related_keywords: [], semantic_variations: [], average_density: 1.0, keyword_cloud: [] },
     semantic_analysis: { semantic_clusters: [], lsi_keywords: [], concept_hierarchy: {}, topic_relationships: [] },
-    readability: { average_reading_level: 'High School', average_sentence_length: 15, tone: 'Informational', writing_style: 'Professional', accessibility: 'Standard', complexity: 'Moderate' },
-    seo_analysis: { average_seo_score: 75, title_optimization: 'N/A', meta_quality: 'N/A', heading_hierarchy: 'N/A', internal_linking: 'N/A', external_references: 'N/A', schema_opportunities: [], content_freshness: 'N/A', recommendations: [] },
+    readability: { average_reading_level: 'Not available', average_sentence_length: 0, tone: 'Not available', writing_style: 'Not available', accessibility: 'Not available', complexity: 'Not available' },
+    seo_analysis: { average_seo_score: 0, title_optimization: 'N/A', meta_quality: 'N/A', heading_hierarchy: 'N/A', internal_linking: 'N/A', external_references: 'N/A', schema_opportunities: [], content_freshness: 'N/A', recommendations: [] },
     entities: { people: [], organizations: [], products: [], technologies: [], frameworks: [], standards: [], locations: [], industry_terms: [] },
     knowledge_gaps: { common_topics: [], unique_insights: [], missing_concepts: [], weak_explanations: [], content_opportunities: [] },
     knowledge_synthesis: { unified_understanding: '', key_insights: [], best_concepts: [], actionable_opportunities: [] },
@@ -234,15 +245,26 @@ function mergeAnalysis(raw: any, keyword: string): SerpIntelResponse['analysis']
       actionable_opportunities: Array.isArray(a.knowledge_synthesis?.actionable_opportunities) ? a.knowledge_synthesis.actionable_opportunities : d.knowledge_synthesis.actionable_opportunities,
     },
     summary: String(a.summary ?? ''),
+    competitor_profiles: Array.isArray(a.competitor_profiles) ? a.competitor_profiles : undefined,
+    semantic_baseline: a.semantic_baseline,
+    information_gain: a.information_gain,
+    advanced_stats: a.advanced_stats,
+    graph_data: a.graph_data,
   }
+}
+
+function nullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const numberValue = Number(value)
+  return Number.isFinite(numberValue) ? numberValue : null
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
-export async function analyzeSerpIntelligence(keyword: string, searchEngine: string = 'Google'): Promise<SerpIntelResponse> {
+export async function analyzeSerpIntelligence(keyword: string, searchEngine: string = 'Google', forceRefresh: boolean = false): Promise<SerpIntelResponse> {
   const raw = await apiFetch<any>('/api/v1/serp-intel/analyze', {
     method: 'POST',
-    body: JSON.stringify({ keyword, searchEngine }),
+    body: JSON.stringify({ keyword, searchEngine, forceRefresh }),
   })
 
   // Backend returns either serp_analysis (new) or analysis (legacy)
@@ -263,18 +285,77 @@ export async function analyzeSerpIntelligence(keyword: string, searchEngine: str
           url: String(r?.url ?? ''),
           domain: String(r?.domain ?? ''),
           meta_description: String(r?.meta_description ?? ''),
-          word_count: Number(r?.word_count ?? 0),
-          estimated_read_time_min: Number(r?.estimated_read_time_min ?? 1),
-          local_seo_score: Number(r?.local_seo_score ?? 50),
+          word_count: nullableNumber(r?.word_count),
+          estimated_read_time_min: nullableNumber(r?.estimated_read_time_min),
+          local_seo_score: nullableNumber(r?.local_seo_score),
           publish_date: r?.publish_date ?? null,
           favicon: String(r?.favicon ?? ''),
+          extraction_status: typeof r?.extraction_status === 'string' ? r.extraction_status : undefined,
+          is_extraction_failed: typeof r?.is_extraction_failed === 'boolean' ? r.is_extraction_failed : undefined,
+          extraction_reason: typeof r?.extraction_reason === 'string' ? r.extraction_reason : null,
+          manual_content: Boolean(r?.manual_content),
+          serp_refreshed_at: typeof r?.serp_refreshed_at === 'string' ? r.serp_refreshed_at : undefined,
         }
       })
     : []
 
   return {
     keyword: String(raw?.keyword ?? keyword),
-    generated_at: String(raw?.generated_at ?? new Date().toISOString()),
+    generated_at: typeof raw?.generated_at === 'string' ? raw.generated_at : null,
+    serp_refreshed_at: typeof raw?.serp_refreshed_at === 'string'
+      ? raw.serp_refreshed_at
+      : serpResults.find(result => result.serp_refreshed_at)?.serp_refreshed_at ?? null,
+    processing_time_ms: Number(raw?.processing_time_ms ?? raw?.metadata?.processing_time_ms ?? 0),
+    is_cached: Boolean(raw?.is_cached ?? false),
+    serp_results: serpResults,
+    analysis: mergeAnalysis(analysisBlock, keyword),
+  }
+}
+
+
+export interface ManualCompetitorContent {
+  competitor_position: number
+  url: string
+  content: string
+}
+
+export async function analyzeSerpIntelligenceWithManualContent(
+  keyword: string,
+  competitors: ManualCompetitorContent[],
+  searchEngine: string = 'Google',
+): Promise<SerpIntelResponse> {
+  const raw = await apiFetch<any>('/api/v1/serp-intel/manual-content', {
+    method: 'POST',
+    body: JSON.stringify({ keyword, searchEngine, competitors }),
+  })
+
+  const analysisBlock = raw?.serp_analysis ?? raw?.analysis ?? {}
+  const serpResults: SerpResult[] = Array.isArray(raw?.serp_results)
+    ? raw.serp_results.map((r: any, idx: number): SerpResult => ({
+        competitor_position: Number(r?.competitor_position ?? r?.position ?? idx + 1),
+        google_position: Number(r?.google_position ?? r?.position ?? idx + 1),
+        position: Number(r?.competitor_position ?? r?.position ?? idx + 1),
+        title: String(r?.title ?? 'Untitled'),
+        url: String(r?.url ?? ''),
+        domain: String(r?.domain ?? ''),
+        meta_description: String(r?.meta_description ?? ''),
+        word_count: nullableNumber(r?.word_count),
+        estimated_read_time_min: nullableNumber(r?.estimated_read_time_min),
+        local_seo_score: nullableNumber(r?.local_seo_score),
+        publish_date: r?.publish_date ?? null,
+        favicon: String(r?.favicon ?? ''),
+        extraction_status: typeof r?.extraction_status === 'string' ? r.extraction_status : undefined,
+        is_extraction_failed: typeof r?.is_extraction_failed === 'boolean' ? r.is_extraction_failed : undefined,
+        extraction_reason: typeof r?.extraction_reason === 'string' ? r.extraction_reason : null,
+        manual_content: Boolean(r?.manual_content),
+        serp_refreshed_at: typeof r?.serp_refreshed_at === 'string' ? r.serp_refreshed_at : undefined,
+      }))
+    : []
+
+  return {
+    keyword: String(raw?.keyword ?? keyword),
+    generated_at: typeof raw?.generated_at === 'string' ? raw.generated_at : null,
+    serp_refreshed_at: typeof raw?.serp_refreshed_at === 'string' ? raw.serp_refreshed_at : serpResults.find(r => r.serp_refreshed_at)?.serp_refreshed_at ?? null,
     processing_time_ms: Number(raw?.processing_time_ms ?? raw?.metadata?.processing_time_ms ?? 0),
     is_cached: Boolean(raw?.is_cached ?? false),
     serp_results: serpResults,

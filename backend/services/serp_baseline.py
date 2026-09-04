@@ -23,7 +23,8 @@ async def ensure_keyword_and_serp(
     fast_mode: bool = True,
     search_engine: str = "Google",
     country: str = "us",
-    language: str = "en"
+    language: str = "en",
+    force_refresh: bool = False,
 ) -> tuple[Any, list[SerpResult]]:
     """Ensure keyword exists and SERP rows are available; returns (keyword, serp_docs)."""
     kw_result = await db.execute(
@@ -48,11 +49,13 @@ async def ensure_keyword_and_serp(
     # if a rollback inside collect_serp_for_keyword expires the ORM object !!
     kw_id: str = str(kw_obj.id)
 
-    # Only skip collection if this specific keyword already has enough data
-    if serp_count < min_required:
+    # Recollect when explicitly requested. The SERP Intelligence UI
+    # exposes this as "Refresh SERP"; without this flag stale extraction
+    # failures in the baseline would survive indefinitely.
+    if force_refresh or serp_count < min_required:
         logger.info("Collecting SERP baseline for '%s' (had %d rows, need %d)", keyword, serp_count, min_required)
         try:
-            await collect_serp_for_keyword(kw_id, vertical, db, force_refresh=False, fast_mode=fast_mode, country=country, language=language)
+            await collect_serp_for_keyword(kw_id, vertical, db, force_refresh=force_refresh, fast_mode=fast_mode, country=country, language=language)
         except Exception as exc:
             logger.warning("SERP collection failed for '%s': %s — will use whatever is in DB", keyword, exc)
 
@@ -110,8 +113,11 @@ async def ensure_keyword_and_serp(
         for comp in fallback_filtered:
             for doc in raw_fallback_docs:
                 if doc.url == comp["url"]:
-                    doc.position = comp["competitor_position"]
-                    doc.google_position = comp["google_position"]
+                    # Keep the persisted Google rank intact. Competitor rank is
+                    # presentation metadata and must never overwrite the unique
+                    # (keyword_id, position) database key.
+                    object.__setattr__(doc, "competitor_position", comp["competitor_position"])
+                    object.__setattr__(doc, "google_position", comp["google_position"])
                     serp_docs.append(doc)
                     break
                     

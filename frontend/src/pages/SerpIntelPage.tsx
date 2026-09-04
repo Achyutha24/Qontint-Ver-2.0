@@ -25,11 +25,12 @@ import {
   Search, ExternalLink, Activity, Info, Network, BookOpen, MessageSquare,
   Database, FileText, Download, Target, ChevronDown, ChevronUp, LayoutDashboard,
   RefreshCw, CheckCircle2, AlertTriangle, Layers, Award, Lightbulb,
-  FileCheck, PieChart, BarChart3, HelpCircle, FileSpreadsheet, MapPin, ListOrdered, Share2, Sliders
+  FileCheck, PieChart, BarChart3, HelpCircle, FileSpreadsheet, MapPin, ListOrdered, Share2, ClipboardPaste, AlertCircle, Check
 } from 'lucide-react'
 import { useTheme } from '../hooks/useTheme'
 import CinematicLoader from '../components/ui/CinematicLoader'
-import { analyzeSerpIntelligence, type SerpIntelResponse } from '../api/serpIntelService'
+import SectionBottomNav from '../components/ui/SectionBottomNav'
+import { analyzeSerpIntelligence, analyzeSerpIntelligenceWithManualContent, type SerpIntelResponse } from '../api/serpIntelService'
 import Graph2D, { type GraphNode, type GraphEdge } from '../components/Graph2D'
 import Graph3D from '../components/Graph3D'
 import PageContainer from '../components/layout/PageContainer'
@@ -49,6 +50,21 @@ function safeStr(val: unknown, fallback = ''): string {
 function safeNum(val: unknown, fallback = 0): number {
   const n = Number(val)
   return isNaN(n) ? fallback : n
+}
+
+function optionalNum(val: unknown): number | null {
+  if (val === null || val === undefined || val === '') return null
+  const n = Number(val)
+  return Number.isFinite(n) ? n : null
+}
+
+function competitorMetric(value: unknown, extractionFailed = false, suffix = ''): string {
+  const numberValue = optionalNum(value)
+  return extractionFailed || numberValue === null ? 'Not available' : `${numberValue.toLocaleString()}${suffix}`
+}
+
+function competitorText(value: unknown, extractionFailed = false): string {
+  return extractionFailed || typeof value !== 'string' || !value.trim() ? 'Not available' : value
 }
 
 function safeBool(val: unknown, fallback = false): boolean {
@@ -132,15 +148,18 @@ const EXAMPLE_KEYWORDS = [
   "E-Commerce Platforms"
 ]
 
-const TABS = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { id: 'topic-coverage', label: 'Topic Coverage', icon: PieChart },
-  { id: 'semantic-clusters', label: 'Semantic Clusters', icon: Network },
-  { id: 'knowledge-gaps', label: 'Knowledge Gaps', icon: Info },
-  { id: 'competitor-analysis', label: 'Competitor Analysis', icon: BarChart3 },
-  { id: 'ai-recommendations', label: 'AI Recommendations', icon: Lightbulb },
-  { id: 'topic-map', label: 'Topic Map', icon: MapPin },
-  { id: 'executive-summary', label: 'Executive Summary', icon: Award },
+import { DEFAULT_FEATURE_FLAGS, type FeatureFlags } from '../config/featureFlags'
+
+const ALL_TABS = [
+  { id: 'overview', label: 'SERP Overview', icon: LayoutDashboard, flagKey: 'serpOverview' as keyof FeatureFlags },
+  { id: 'topic-coverage', label: 'Topic Coverage', icon: PieChart, flagKey: 'benchmarkMatrix' as keyof FeatureFlags },
+  { id: 'competitor-analysis', label: 'Competitor Analysis', icon: BarChart3, flagKey: 'competitorAnalysis' as keyof FeatureFlags },
+  { id: 'semantic-clusters', label: 'Semantic Topic Clusters', icon: Network, flagKey: 'semanticTopicClusters' as keyof FeatureFlags },
+  { id: 'ai-recommendations', label: 'Recommendations', icon: Lightbulb, flagKey: 'recommendations' as keyof FeatureFlags },
+  { id: 'serp-timeline', label: 'SERP Timeline', icon: Activity, flagKey: 'serpTimeline' as keyof FeatureFlags },
+  { id: 'executive-summary', label: 'Executive Summary', icon: Award, flagKey: 'executiveSummary' as keyof FeatureFlags },
+  { id: 'knowledge-gaps', label: 'Knowledge Gaps (Beta)', icon: Info, flagKey: 'knowledgeGaps' as keyof FeatureFlags },
+  { id: 'information-gain', label: 'Information Gain (Beta)', icon: Target, flagKey: 'informationGain' as keyof FeatureFlags },
 ]
 
 type PageStatus = 'IDLE' | 'LOADING' | 'SUCCESS' | 'ERROR'
@@ -155,18 +174,53 @@ export default function SerpIntelPage() {
   const [graphDimension, setGraphDimension] = useState<'2D' | '3D'>('2D')
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null)
   const [expandedCluster, setExpandedCluster] = useState<number | null>(0)
+  const [manualDrafts, setManualDrafts] = useState<Record<number, string>>({})
+  const [manualSubmitting, setManualSubmitting] = useState(false)
+  const [manualMessage, setManualMessage] = useState<string | null>(null)
+  // Tracks which competitor_positions were successfully manually analyzed in this session.
+  // Used to show a success banner on cards even after the textarea section disappears.
+  const [manualSuccessPositions, setManualSuccessPositions] = useState<Set<number>>(new Set())
 
-  const handleAnalyze = async (searchKw: string) => {
+  // Phase 5 Enterprise UX States & Feature Flags
+  const activeFlags = DEFAULT_FEATURE_FLAGS
+  const visibleTabs = useMemo(() => ALL_TABS.filter(t => activeFlags[t.flagKey]), [activeFlags])
+  const [selectedScoreFormula, setSelectedScoreFormula] = useState<{ title: string; formula: string; evidence: string; confidence: number; breakdown: Record<string, any> } | null>(null)
+  const [gapSearchText, setGapSearchText] = useState('')
+  const [gapCategoryFilter, setGapCategoryFilter] = useState('ALL')
+  const [gapPriorityFilter, setGapPriorityFilter] = useState('ALL')
+  const [recPriorityFilter, setRecPriorityFilter] = useState('ALL')
+  const [compSortKey, setCompSortKey] = useState<'rank' | 'words' | 'readability'>('rank')
+  const [evidenceModalSentence, setEvidenceModalSentence] = useState<string | null>(null)
+
+  const topReportRef = useRef<HTMLDivElement>(null)
+  const latestRequestIdRef = useRef<number>(0)
+
+  const handleSectionNavigate = (targetTabId: string) => {
+    setActiveTab(targetTabId)
+    setTimeout(() => {
+      if (topReportRef.current) {
+        topReportRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }
+    }, 40)
+  }
+
+  const handleAnalyze = async (searchKw?: string, forceRefresh: boolean = false) => {
     const kw = (searchKw || keyword).trim()
     if (!kw) return
 
+    const currentRequestId = ++latestRequestIdRef.current
     setStatus('LOADING')
     setError(null)
     setReport(null)
+    setManualDrafts({})
+    setManualMessage(null)
     setKeyword(kw)
 
     try {
-      const data = await analyzeSerpIntelligence(kw, searchEngine)
+      const data = await analyzeSerpIntelligence(kw, searchEngine, forceRefresh)
+      if (currentRequestId !== latestRequestIdRef.current) return
       setReport(data)
       saveReportToRepository({
         title: `SERP Intelligence Audit: ${kw}`,
@@ -174,7 +228,7 @@ export default function SerpIntelPage() {
         type: 'SERP Intelligence',
         category: 'Competitive Intelligence',
         domain: searchEngine,
-        score: data?.overview?.overallScore || 86,
+        score: data?.analysis?.overall_score?.score || 0,
         rank: '#1',
         payload: data,
         originalRoute: '/app/serp-intel'
@@ -182,14 +236,165 @@ export default function SerpIntelPage() {
       setStatus('SUCCESS')
       setActiveTab('overview')
     } catch (err: any) {
+      if (currentRequestId !== latestRequestIdRef.current) return
       const msg = err?.message || 'An error occurred during SERP analysis. Please try again.'
       setError(msg)
       setStatus('ERROR')
     }
   }
 
+  const handleManualSubmit = async () => {
+    if (!report) return
+    const failedCompetitors = competitorProfiles.filter((cp: any) => cp.is_extraction_failed && !cp.manual_content)
+    const competitors = failedCompetitors
+      .map((cp: any) => ({
+        competitor_position: cp.competitor_position,
+        url: cp.url,
+        content: (manualDrafts[cp.competitor_position] || '').trim(),
+      }))
+      .filter((item: any) => item.content)
+
+    if (!competitors.length) {
+      setManualMessage('Paste the page content for at least one unavailable competitor first.')
+      return
+    }
+
+    const tooShort = competitors.find((item: any) => item.content.split(/\s+/).filter(Boolean).length < 300)
+    if (tooShort) {
+      setManualMessage('Please paste at least 300 words for each competitor you want Qontint to analyze.')
+      return
+    }
+
+    const currentRequestId = ++latestRequestIdRef.current
+    const submittedPositions = competitors.map((c: any) => c.competitor_position)
+
+    // ── Phase 1: Immediate local deterministic calculation ───────────────────
+    // Calculate word count, read time, and manual flags directly from the pasted text.
+    // The user's pasted text is the source of truth; do NOT wait for Gemini or backend.
+    const submittedDataMap = new Map<number, { wordCount: number; readTimeMin: number; content: string }>()
+    competitors.forEach((c: any) => {
+      const words = c.content.split(/\s+/).filter(Boolean).length
+      const readTime = Math.max(1, Math.ceil(words / 200))
+      submittedDataMap.set(c.competitor_position, { wordCount: words, readTimeMin: readTime, content: c.content })
+    })
+
+    // Immediately update React report state so dashboard cards and benchmark matrix
+    // flip from "Unavailable" to actual numbers synchronously.
+    setReport(prev => {
+      if (!prev) return prev
+      const updatedSerpResults = (prev.serp_results || []).map((r: any, idx: number) => {
+        const pos = Number(r.competitor_position ?? r.position ?? idx + 1)
+        const local = submittedDataMap.get(pos)
+        if (local) {
+          return {
+            ...r,
+            word_count: local.wordCount,
+            estimated_read_time_min: local.readTimeMin,
+            is_extraction_failed: false,
+            extraction_status: 'Success',
+            manual_content: true,
+          }
+        }
+        return r
+      })
+
+      const rawProfiles = prev.analysis?.competitor_profiles || []
+      const updatedProfiles = rawProfiles.map((cp: any, idx: number) => {
+        const pos = Number(cp.competitor_position ?? cp.position ?? idx + 1)
+        const local = submittedDataMap.get(pos)
+        if (local) {
+          return {
+            ...cp,
+            word_count: local.wordCount,
+            estimated_read_time_min: local.readTimeMin,
+            is_extraction_failed: false,
+            extraction_status: 'Manual Analysis Complete',
+            manual_content: true,
+            extraction_method: 'manual_paste',
+            extraction_confidence: 100,
+          }
+        }
+        return cp
+      })
+
+      // Recalculate average word count for semantic baseline using available competitors
+      const allValidWords = updatedSerpResults
+        .filter((r: any) => !r.is_extraction_failed && typeof r.word_count === 'number')
+        .map((r: any) => r.word_count)
+      const avgWordCount = allValidWords.length > 0
+        ? Math.round(allValidWords.reduce((a: number, b: number) => a + b, 0) / allValidWords.length)
+        : prev.analysis?.semantic_baseline?.avg_word_count || 0
+
+      return {
+        ...prev,
+        serp_results: updatedSerpResults,
+        analysis: {
+          ...prev.analysis,
+          competitor_profiles: updatedProfiles,
+          semantic_baseline: {
+            ...prev.analysis?.semantic_baseline,
+            avg_word_count: avgWordCount,
+          },
+          content_structure: {
+            ...prev.analysis?.content_structure,
+            average_word_count: avgWordCount,
+          }
+        }
+      }
+    })
+
+    // Mark positions as manually analyzed in this session immediately
+    setManualSuccessPositions(prev => {
+      const next = new Set(prev)
+      submittedPositions.forEach((pos: number) => next.add(pos))
+      return next
+    })
+
+    const posLabels = submittedPositions.map((p: number) => `#${p}`).join(', ')
+    setManualSubmitting(true)
+    setManualMessage(`Analyzing pasted content for Competitor${submittedPositions.length > 1 ? 's' : ''} ${posLabels}... Deterministic metrics updated.`)
+
+    // ── Phase 2 & 3: Background AI / Semantic Analysis & Clean Merge ─────────
+    try {
+      const updated = await analyzeSerpIntelligenceWithManualContent(keyword, competitors, searchEngine)
+      if (currentRequestId !== latestRequestIdRef.current) return
+
+      // Replace full report with backend response which carries full NLP and AI synthesis
+      setReport(updated)
+
+      // Clear drafts for analyzed competitors
+      setManualDrafts(prev => {
+        const next = { ...prev }
+        submittedPositions.forEach((pos: number) => { delete next[pos] })
+        return next
+      })
+
+      setManualMessage(`✓ Manual analysis complete for Competitor${submittedPositions.length > 1 ? 's' : ''} ${posLabels}. All sections updated.`)
+      saveReportToRepository({
+        title: `SERP Intelligence Audit: ${keyword}`,
+        keyword,
+        type: 'SERP Intelligence',
+        category: 'Competitive Intelligence',
+        domain: searchEngine,
+        score: updated?.analysis?.overall_score?.score || 0,
+        rank: '#1',
+        payload: updated,
+        originalRoute: '/app/serp-intel'
+      })
+    } catch (err: any) {
+      if (currentRequestId !== latestRequestIdRef.current) return
+      // Locally calculated metrics remain intact in state; never revert to "Unavailable"
+      setManualMessage(`Manual content recorded locally. Note: AI synthesis notice: ${err?.message || 'AI service unavailable; deterministic metrics preserved.'}`)
+    } finally {
+      if (currentRequestId === latestRequestIdRef.current) {
+        setManualSubmitting(false)
+      }
+    }
+  }
+
+
   const handleRetry = () => {
-    if (keyword.trim()) handleAnalyze(keyword)
+    if (keyword.trim()) handleAnalyze(keyword, false)
   }
 
   const isLoading = status === 'LOADING'
@@ -209,8 +414,8 @@ export default function SerpIntelPage() {
   const serpResults = safeArray(report?.serp_results)
 
   const overallScore = analysis?.overall_score ?? {}
-  const scoreValue = safeNum(overallScore?.score, 85)
-  const scoreLabel = safeStr(overallScore?.label, 'Competitive')
+  const scoreValue = safeNum(overallScore?.score, 0)
+  const scoreLabel = safeStr(overallScore?.label, report ? 'Not available' : '—')
   const breakdown = overallScore?.breakdown ?? {}
 
   const searchIntent = analysis?.search_intent ?? {}
@@ -229,43 +434,108 @@ export default function SerpIntelPage() {
   // ── New M1 Semantic Baseline fields ─────────────────────────────────────────
   const semanticBaseline = analysis?.semantic_baseline ?? {}
   const rawCompetitorProfiles = safeArray(analysis?.competitor_profiles)
-  const competitorProfiles = serpResults.slice(0, 3).map((res: any, idx: number) => {
-    const cp = rawCompetitorProfiles[idx] || {}
-    const wCount = safeNum(cp?.word_count || res?.word_count, 1500)
-    return {
-      competitor_position: safeNum(cp?.competitor_position ?? res?.competitor_position ?? res?.position, idx + 1),
-      google_position: safeNum(cp?.google_position ?? res?.google_position ?? res?.position, idx + 1),
-      title: safeStr(cp?.title || res?.title, `Competitor #${idx + 1}`),
-      url: safeStr(cp?.url || res?.url, ''),
-      domain: safeStr(cp?.domain || res?.domain, `Competitor #${idx + 1}`),
-      word_count: wCount,
-      heading_count: safeNum(cp?.heading_count, Math.max(5, Math.round(wCount / 250))),
-      h1_count: safeNum(cp?.h1_count, 1),
-      h2_count: safeNum(cp?.h2_count, 5),
-      h3_count: safeNum(cp?.h3_count, 3),
-      paragraph_count: safeNum(cp?.paragraph_count, Math.max(8, Math.round(wCount / 60))),
-      avg_heading_depth: safeNum(cp?.avg_heading_depth, 2.2),
-      primary_entities: safeArray(cp?.primary_entities).length > 0 ? safeArray(cp.primary_entities) : [keyword || 'Target Query', 'Enterprise Architecture', 'Industry Standard'],
-      supporting_entities: safeArray(cp?.supporting_entities).length > 0 ? safeArray(cp.supporting_entities) : ['Implementation Blueprint', 'Best Practices', 'Platform Modules'],
-      industry_terms: safeArray(cp?.industry_terms).length > 0 ? safeArray(cp.industry_terms) : ['Workflow Automation', 'Compliance Security'],
-      topic_focus: safeArray(cp?.topic_focus).length > 0 ? safeArray(cp.topic_focus) : [keyword || 'Target Query', 'Features & Capabilities', 'Platform Comparison'],
-      search_intent: safeStr(cp?.search_intent, 'Informational & Commercial'),
-      reading_level: safeStr(cp?.reading_level || readability?.average_reading_level, '10th Grade'),
-      faq_count: safeNum(cp?.faq_count, 2),
-      media_count: safeNum(cp?.media_count, 3),
-      table_count: safeNum(cp?.table_count, 1),
-      list_count: safeNum(cp?.list_count, 5),
-      internal_links: safeNum(cp?.internal_links, 8),
-      external_links: safeNum(cp?.external_links, 3),
-      semantic_density: safeStr(cp?.semantic_density, '1.5%'),
-      estimated_content_depth: safeStr(cp?.estimated_content_depth || cp?.content_depth, wCount >= 2000 ? 'Deep' : 'Moderate'),
-      main_strengths: safeArray(cp?.main_strengths ?? cp?.strengths).length > 0 ? safeArray(cp.main_strengths ?? cp.strengths) : [`Substantive word count (${wCount.toLocaleString()} words)`, 'Structured heading hierarchy'],
-      strengths: safeArray(cp?.strengths ?? cp?.main_strengths).length > 0 ? safeArray(cp.strengths ?? cp.main_strengths) : [`Substantive word count (${wCount.toLocaleString()} words)`, 'Structured heading hierarchy'],
-      weaknesses: safeArray(cp?.weaknesses).length > 0 ? safeArray(cp.weaknesses) : ['Lacks structured FAQ schema markup', 'Opportunity for deeper technical entity coverage'],
-      entity_count: safeNum(cp?.entity_count, (safeArray(cp?.primary_entities).length || 3) + (safeArray(cp?.supporting_entities).length || 5)),
-      topic_cluster_count: safeNum(cp?.topic_cluster_count, 3),
-    }
-  })
+  // Build a position-keyed source of truth. Manual SERP analysis can update a
+  // competitor's profile while the cached SERP row still contains the old
+  // extraction metadata. Every UI surface must resolve the same competitor by
+  // competitor_position, never by array index.
+  const serpByPosition = new Map<number, any>(
+    serpResults.map((result: any, idx: number) => [
+      Number(result?.competitor_position ?? result?.position ?? idx + 1),
+      result,
+    ])
+  )
+  const profilesByPosition = new Map<number, any>(
+    rawCompetitorProfiles.map((profile: any, idx: number) => [
+      Number(profile?.competitor_position ?? profile?.position ?? idx + 1),
+      profile,
+    ])
+  )
+  const maxCompCount = Math.max(serpResults.length, rawCompetitorProfiles.length)
+  const competitorPositions = Array.from(new Set(
+    [...serpResults, ...rawCompetitorProfiles].map((item: any, idx: number) =>
+      Number(item?.competitor_position ?? item?.position ?? idx + 1)
+    )
+  )).filter(Number.isFinite).sort((a, b) => a - b).slice(0, 3)
+  const competitorProfiles = competitorPositions.length
+    ? competitorPositions.map((position: number, idx: number) => {
+      const res = serpByPosition.get(position) || {}
+      const cp = profilesByPosition.get(position) || {}
+
+      // Prefer the derived competitor profile for analysis metrics, then fall
+      // back to the SERP row for page-level metadata. This is especially
+      // important after a manual paste because the two response branches may
+      // otherwise have different versions of the same competitor.
+      const manualResolved = Boolean(res?.manual_content || cp?.manual_content)
+      const resolvedWordCount = optionalNum(cp?.word_count ?? res?.word_count)
+      const resolvedExtractionFailed = manualResolved
+        ? false
+        : Boolean(cp?.is_extraction_failed || res?.is_extraction_failed)
+      const extractionStatus = safeStr(
+        manualResolved ? 'Success' : (cp?.extraction_status ?? res?.extraction_status)
+      )
+      const isFailed = resolvedExtractionFailed || extractionStatus === 'Extraction Failed'
+      const readTime = optionalNum(cp?.estimated_read_time_min)
+        ?? optionalNum(res?.estimated_read_time_min)
+        ?? (resolvedWordCount !== null ? Math.max(1, Math.ceil(resolvedWordCount / 200)) : null)
+
+      return {
+        competitor_position: safeNum(cp?.competitor_position ?? res?.competitor_position ?? res?.position, position),
+        google_position: safeNum(cp?.google_position ?? res?.google_position ?? res?.position, position),
+        title: safeStr(cp?.title || res?.title, `Competitor #${position}`),
+        url: safeStr(cp?.url || res?.url, ''),
+        domain: safeStr(cp?.domain || res?.domain, `Competitor #${position}`),
+        favicon: safeStr(cp?.favicon ?? res?.favicon),
+        word_count: resolvedWordCount,
+        estimated_read_time_min: readTime,
+        heading_count: optionalNum(cp?.heading_count ?? res?.heading_count),
+        h1_count: optionalNum(cp?.h1_count),
+        h2_count: optionalNum(cp?.h2_count),
+        h3_count: optionalNum(cp?.h3_count),
+        paragraph_count: optionalNum(cp?.paragraph_count ?? res?.paragraph_count),
+        avg_heading_depth: optionalNum(cp?.avg_heading_depth),
+        primary_entities: safeArray(cp?.primary_entities),
+        supporting_entities: safeArray(cp?.supporting_entities),
+        industry_terms: safeArray(cp?.industry_terms),
+        topic_focus: safeArray(cp?.topic_focus),
+        search_intent: safeStr(cp?.search_intent),
+        reading_level: safeStr(cp?.reading_level),
+        readability_score: optionalNum(cp?.readability_score),
+        faq_count: optionalNum(cp?.faq_count),
+        media_count: optionalNum(cp?.media_count),
+        table_count: optionalNum(cp?.table_count),
+        list_count: optionalNum(cp?.list_count),
+        internal_links: optionalNum(cp?.internal_links),
+        external_links: optionalNum(cp?.external_links),
+        semantic_density: safeStr(cp?.semantic_density),
+        estimated_content_depth: safeStr(cp?.estimated_content_depth || cp?.content_depth),
+        main_strengths: safeArray(cp?.main_strengths ?? cp?.strengths).length > 0 ? safeArray(cp.main_strengths ?? cp.strengths) : [isFailed ? 'Ranked in organic SERP top results' : 'Extracted content'],
+        strengths: safeArray(cp?.strengths ?? cp?.main_strengths).length > 0 ? safeArray(cp.strengths ?? cp.main_strengths) : [isFailed ? 'Ranked in organic SERP top results' : 'Extracted content'],
+        weaknesses: safeArray(cp?.weaknesses).length > 0 ? safeArray(cp.weaknesses) : [isFailed ? 'Extraction Failed (<300 words)' : 'Opportunity for deeper entity coverage'],
+        entity_count: optionalNum(cp?.entity_count),
+        entity_diversity: safeStr(cp?.entity_diversity),
+        topic_cluster_count: optionalNum(cp?.topic_cluster_count),
+        topical_authority_score: optionalNum(cp?.topical_authority_score),
+        semantic_richness_score: optionalNum(cp?.semantic_richness_score),
+        content_completeness_score: optionalNum(cp?.content_completeness_score),
+        entity_coverage_score: optionalNum(cp?.entity_coverage_score),
+        structural_quality_score: optionalNum(cp?.structural_quality_score),
+        information_gain_score: optionalNum(cp?.information_gain_score),
+        http_status: optionalNum(cp?.http_status ?? res?.http_status),
+        html_size: optionalNum(cp?.html_size ?? res?.html_size),
+        extraction_method: safeStr(cp?.extraction_method ?? res?.extraction_method),
+        extraction_confidence: optionalNum(cp?.extraction_confidence ?? res?.extraction_confidence),
+        extraction_status: extractionStatus || (isFailed ? 'Extraction Failed' : 'Not available'),
+        is_extraction_failed: isFailed,
+        manual_content: manualResolved,
+      }
+    })
+    : []
+  const extractedCompetitors = competitorProfiles.filter(cp => !cp.is_extraction_failed)
+  const wordCounts = extractedCompetitors.map(cp => cp.word_count).filter((value): value is number => value !== null)
+  const entityLeader = extractedCompetitors
+    .filter(cp => cp.entity_count !== null)
+    .sort((left, right) => (right.entity_count ?? 0) - (left.entity_count ?? 0))[0]
+  const topContentDepth = extractedCompetitors.find(cp => cp.estimated_content_depth)
   const informationGain = analysis?.information_gain ?? {}
   const coverageScore = safeNum(analysis?.coverage_score ?? topicCoverage?.coverage_score, safeNum(breakdown?.semantic_coverage, 0))
   const advancedStats = analysis?.advanced_stats ?? {}
@@ -427,26 +697,52 @@ export default function SerpIntelPage() {
               <option value="DuckDuckGo">DuckDuckGo</option>
             </select>
           </div>
-          <div className="relative">
-            <input
-              type="text"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAnalyze('')}
-              placeholder="Enter target keyword or phrase..."
-              className="w-full bg-[var(--bg-void)] border border-[var(--border-subtle)] rounded-xl py-4 pl-14 pr-32 text-[var(--text-primary)] font-mono focus:border-[var(--aurora)] focus:ring-1 focus:ring-[var(--aurora)] transition-all"
-              disabled={isLoading}
-            />
-            <Search className="absolute left-5 top-4 text-[var(--text-muted)]" size={20} />
+          <div className="relative flex items-center gap-2">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAnalyze('', false)}
+                placeholder="Enter target keyword or phrase..."
+                className="w-full bg-[var(--bg-void)] border border-[var(--border-subtle)] rounded-xl py-4 pl-14 pr-32 text-[var(--text-primary)] font-mono focus:border-[var(--aurora)] focus:ring-1 focus:ring-[var(--aurora)] transition-all"
+                disabled={isLoading}
+              />
+              <Search className="absolute left-5 top-4 text-[var(--text-muted)]" size={20} />
+              <button
+                onClick={() => handleAnalyze('', false)}
+                disabled={isLoading || !keyword.trim()}
+                className="absolute right-2 top-2 bg-[var(--aurora)] hover:bg-[var(--aurora)]/90 text-white px-6 py-2 rounded-lg font-bold transition-all disabled:opacity-50"
+              >
+                Analyze
+              </button>
+            </div>
             <button
-              onClick={() => handleAnalyze('')}
+              onClick={() => handleAnalyze('', true)}
               disabled={isLoading || !keyword.trim()}
-              className="absolute right-2 top-2 bg-[var(--aurora)] hover:bg-[var(--aurora)]/90 text-white px-6 py-2 rounded-lg font-bold transition-all disabled:opacity-50"
+              title="Ignore cache and perform a fresh live SERP collection"
+              className="flex items-center gap-1.5 px-4 py-4 bg-[var(--bg-depth)] border border-[var(--border-subtle)] hover:border-[var(--aurora)] text-[var(--text-primary)] hover:text-[var(--aurora)] rounded-xl font-medium text-sm transition-all disabled:opacity-50"
             >
-              Analyze
+              <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+              <span>Refresh SERP</span>
             </button>
           </div>
         </div>
+
+        {/* Cache Status & Metadata Banner */}
+        {status === 'SUCCESS' && report && (
+          <div className="mt-4 max-w-2xl px-4 py-2.5 bg-[var(--bg-depth)]/80 border border-[var(--border-subtle)] rounded-lg flex items-center justify-between text-xs text-[var(--text-secondary)] font-mono">
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${report.is_cached ? 'bg-emerald-400' : 'bg-cyan-400 animate-pulse'}`}></span>
+              <span>Analysis Source: <strong className="text-[var(--text-primary)]">{report.is_cached ? 'Cached Analysis' : 'Fresh Analysis'}</strong></span>
+              <span className="text-[var(--text-muted)]">|</span>
+              <span>Status: <strong className="text-[var(--text-primary)]">{report.is_cached ? 'Fresh (Cached)' : 'Live Execution'}</strong></span>
+            </div>
+            <div>
+              <span>SERP Refreshed: <strong className="text-[var(--text-primary)]">{report.serp_refreshed_at ? new Date(report.serp_refreshed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'Not available'}</strong></span>
+            </div>
+          </div>
+        )}
 
         {status === 'IDLE' && (
           <div className="mt-4 flex flex-wrap gap-2 max-w-2xl">
@@ -487,30 +783,31 @@ export default function SerpIntelPage() {
       {/* Results State */}
       <AnimatePresence>
         {status === 'SUCCESS' && report && !isLoading && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="space-y-8">
+          <motion.div ref={topReportRef} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="space-y-8">
 
-            {/* ─── PROFESSIONAL TAB BAR ───────────────────────────────────────── */}
-            <div className="sticky top-4 z-30 bg-[var(--bg-card)]/90 backdrop-blur-md p-2 rounded-2xl border border-[var(--border-subtle)] shadow-md">
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 px-1">
-                {TABS.map((tab) => {
+            {/* ─── GUIDED SECTION TOP TAB NAVIGATION ─────────────────────── */}
+            <div className="bg-[var(--bg-card)]/95 backdrop-blur-md p-2 rounded-2xl border border-[var(--border-subtle)] shadow-sm flex items-center justify-between gap-3 min-w-0">
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 px-2 flex-1 min-w-0 scroll-smooth">
+                {visibleTabs.map((tab) => {
                   const IconComponent = tab.icon
                   const isActive = activeTab === tab.id
                   return (
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs md:text-sm whitespace-nowrap transition-all duration-200 ${
+                      className={`flex items-center gap-2 px-3.5 py-2 h-10 rounded-xl font-bold text-xs md:text-sm whitespace-nowrap shrink-0 transition-all duration-200 ${
                         isActive
                           ? 'bg-[#FFEDD5] text-[#F97316] border border-[#FED7AA] shadow-xs'
                           : 'bg-transparent text-[#475569] border border-transparent hover:bg-[#F8FAFC] hover:border-[#E2E8F0]'
                       }`}
                     >
-                      <IconComponent size={16} className={isActive ? 'text-[#F97316]' : 'text-[#475569]'} />
+                      <IconComponent size={16} className={`shrink-0 ${isActive ? 'text-[#F97316]' : 'text-[#475569]'}`} />
                       <span>{tab.label}</span>
                     </button>
                   )
                 })}
               </div>
+
             </div>
 
             {/* ─── TAB CONTENTS (LAZY RENDERED) ───────────────────────────────── */}
@@ -557,32 +854,118 @@ export default function SerpIntelPage() {
                       <Target className="text-[var(--aurora)]" /> Top Search Competitors
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      {serpResults.map((res, i) => (
-                        <div key={i} className="card p-6 border border-[var(--border-subtle)] flex flex-col h-full bg-[var(--bg-card)]/50 hover:border-[var(--aurora)]/50 transition-colors">
+                      {competitorProfiles.slice(0, 3).map((competitor, i) => {
+                        const res = serpByPosition.get(safeNum(competitor?.competitor_position, i + 1)) || {}
+                        const competitorFailed = Boolean(competitor.is_extraction_failed)
+                        const isManual = Boolean(competitor.manual_content)
+                        return (
+                        <div key={i} className={`card p-6 border flex flex-col h-full bg-[var(--bg-card)]/50 hover:border-[var(--aurora)]/50 transition-colors ${isManual ? 'border-emerald-500/40' : 'border-[var(--border-subtle)]'}`}>
                           <div className="flex items-center gap-3 mb-4">
                             <span className="h-8 px-3 rounded-full bg-[var(--bg-void)] flex items-center justify-center font-bold text-[var(--aurora)] border border-[var(--border-subtle)] text-xs whitespace-nowrap">
-                              Competitor #{safeNum(res?.competitor_position, i + 1)} <span className="text-gray-500 font-normal ml-1.5 opacity-80">(Google Rank #{safeNum(res?.google_position, res?.competitor_position ?? i + 1)})</span>
+                              Competitor #{safeNum(competitor?.competitor_position, i + 1)} <span className="text-gray-500 font-normal ml-1.5 opacity-80">(Google Rank #{safeNum(competitor?.google_position, competitor?.competitor_position ?? i + 1)})</span>
                             </span>
-                            <span className="font-mono text-xs text-[var(--text-muted)] truncate">{safeStr(res?.domain)}</span>
+                            <span className="font-mono text-xs text-[var(--text-muted)] truncate">{safeStr(competitor?.domain || res?.domain)}</span>
                           </div>
-                          <h3 className="font-bold text-[var(--text-primary)] mb-3 line-clamp-2 leading-tight flex-1">{safeStr(res?.title, 'Untitled')}</h3>
+                          <h3 className="font-bold text-[var(--text-primary)] mb-2 line-clamp-2 leading-tight flex-1">{safeStr(competitor?.title || res?.title, 'Untitled')}</h3>
+                          {/* Status badges */}
+                          {isManual && (
+                            <p className="text-xs text-emerald-600 mb-3 flex items-center gap-1.5">
+                              <CheckCircle2 size={13} /> Manual analysis complete
+                            </p>
+                          )}
+                          {!isManual && competitorFailed && (
+                            <p className="text-xs text-amber-600 mb-3 flex items-center gap-1.5"><AlertCircle size={13} /> Content unavailable — manual paste available below</p>
+                          )}
                           <div className="grid grid-cols-2 gap-2 mb-4">
                             <div className="bg-[var(--bg-void)] p-2 rounded-lg border border-[var(--border-subtle)]">
                               <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">Words</p>
-                              <p className="font-mono text-sm font-bold text-[var(--text-primary)]">{safeNum(res?.word_count).toLocaleString()}</p>
+                              <p className="font-mono text-sm font-bold text-[var(--text-primary)]">{competitorFailed ? 'Unavailable' : competitorMetric(competitor?.word_count)}</p>
                             </div>
                             <div className="bg-[var(--bg-void)] p-2 rounded-lg border border-[var(--border-subtle)]">
                               <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">Read Time</p>
-                              <p className="font-mono text-sm font-bold text-[var(--text-primary)]">{safeNum(res?.estimated_read_time_min, 1)}m</p>
+                              <p className="font-mono text-sm font-bold text-[var(--text-primary)]">{competitorFailed ? 'Unavailable' : competitor?.estimated_read_time_min !== null && competitor?.estimated_read_time_min !== undefined ? `${competitor.estimated_read_time_min}m` : competitor?.word_count === null ? 'Not available' : `${Math.max(1, Math.ceil((competitor.word_count || 0) / 200))}m`}</p>
                             </div>
                           </div>
-                          {res?.url && (
-                            <a href={res.url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full py-2 bg-[var(--bg-depth)] hover:bg-[var(--aurora)]/10 hover:text-[var(--aurora)] rounded-lg text-sm transition-colors border border-[var(--border-subtle)]">
+                          {competitor?.url && (
+                            <a href={competitor.url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full py-2 bg-[var(--bg-depth)] hover:bg-[var(--aurora)]/10 hover:text-[var(--aurora)] rounded-lg text-sm transition-colors border border-[var(--border-subtle)]">
                               Visit Page <ExternalLink size={14} />
                             </a>
                           )}
                         </div>
-                      ))}
+
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* MANUAL EXTRACTION FALLBACK */}
+                {competitorProfiles.some((cp: any) => Boolean(cp?.is_extraction_failed)) && (
+                  <div className="card p-6 border border-amber-200 bg-amber-50/70 dark:bg-amber-950/10 dark:border-amber-900/40">
+                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-5">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertCircle size={19} className="text-amber-600" />
+                          <h3 className="text-lg font-bold text-[var(--text-primary)]">Some competitor content could not be extracted</h3>
+                        </div>
+                        <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-3xl">
+                          The SERP results are valid, but one or more websites blocked automated extraction or returned too little readable content. Open the source page, copy its main article text, paste it below, and Qontint will run the same competitor analysis on the supplied content.
+                        </p>
+                      </div>
+                      <span className="shrink-0 px-3 py-1.5 rounded-full text-xs font-mono font-bold bg-white/80 border border-amber-200 text-amber-700">
+                        Manual fallback available
+                      </span>
+                    </div>
+
+                    <div className="space-y-4">
+                      {competitorProfiles.filter((cp: any) => cp.is_extraction_failed).map((cp: any) => {
+                        const draft = manualDrafts[cp.competitor_position] || ''
+                        const wordCount = draft.trim() ? draft.trim().split(/\s+/).filter(Boolean).length : 0
+                        return (
+                          <div key={cp.competitor_position} className="rounded-xl border border-amber-200/80 bg-white/80 p-4">
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-xs font-mono font-bold text-amber-700">Competitor #{cp.competitor_position}</span>
+                                  <span className="text-xs text-[var(--text-muted)]">Google Rank #{cp.google_position}</span>
+                                </div>
+                                <p className="font-semibold text-sm text-[var(--text-primary)]">{cp.title}</p>
+                                <p className="text-xs text-[var(--text-muted)] font-mono truncate max-w-2xl">{cp.domain}</p>
+                              </div>
+                              <a href={cp.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-depth)] text-sm font-semibold text-[var(--text-primary)] hover:text-[var(--aurora)] hover:border-[var(--aurora)] transition-colors">
+                                Open Source Page <ExternalLink size={14} />
+                              </a>
+                            </div>
+
+                            <div className="relative">
+                              <textarea
+                                value={draft}
+                                onChange={(e) => setManualDrafts(prev => ({ ...prev, [cp.competitor_position]: e.target.value }))}
+                                placeholder="Paste the main article/content text from the source page here..."
+                                rows={7}
+                                className="w-full resize-y rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--aurora)] focus:ring-1 focus:ring-[var(--aurora)]/20"
+                                disabled={manualSubmitting}
+                              />
+                              <div className="mt-2 flex items-center justify-between text-xs font-mono">
+                                <span className={wordCount >= 300 ? 'text-emerald-600' : 'text-[var(--text-muted)]'}>{wordCount.toLocaleString()} / 300 words minimum</span>
+                                {wordCount >= 300 && <span className="inline-flex items-center gap-1 text-emerald-600"><Check size={13} /> Ready</span>}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    <div className="mt-5 flex flex-col sm:flex-row sm:items-center gap-3">
+                      <button
+                        onClick={handleManualSubmit}
+                        disabled={manualSubmitting}
+                        className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[var(--aurora)] text-white font-bold text-sm hover:opacity-90 disabled:opacity-50 transition-opacity"
+                      >
+                        {manualSubmitting ? <RefreshCw size={15} className="animate-spin" /> : <ClipboardPaste size={15} />}
+                        {manualSubmitting ? 'Analyzing pasted content...' : 'Analyze Pasted Content'}
+                      </button>
+                      {manualMessage && <p className="text-xs text-[var(--text-secondary)]">{manualMessage}</p>}
                     </div>
                   </div>
                 )}
@@ -645,8 +1028,8 @@ export default function SerpIntelPage() {
                   </div>
                 )}
 
-                {/* INFORMATION GAIN PANEL */}
-                {safeArray(informationGain?.differentiation_opportunities).length > 0 && (
+                {/* INFORMATION GAIN PANEL (Beta Feature Flag Gated) */}
+                {activeFlags.informationGain && safeArray(informationGain?.differentiation_opportunities).length > 0 && (
                   <div className="card p-6 border border-amber-500/20 bg-amber-500/5">
                     <h3 className="font-bold text-lg text-[var(--text-primary)] mb-2 flex items-center gap-2">
                       <Lightbulb size={18} className="text-amber-500" /> Differentiation Opportunities
@@ -663,6 +1046,13 @@ export default function SerpIntelPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Section Bottom Guided Navigation */}
+                <SectionBottomNav
+                  nextTabId="topic-coverage"
+                  nextTabLabel="Go to Topic Coverage"
+                  onNavigate={handleSectionNavigate}
+                />
               </div>
             )}
 
@@ -790,6 +1180,15 @@ export default function SerpIntelPage() {
                     </p>
                   </div>
                 </div>
+
+                {/* Section Bottom Guided Navigation */}
+                <SectionBottomNav
+                  prevTabId="overview"
+                  prevTabLabel="SERP Overview"
+                  nextTabId="competitor-analysis"
+                  nextTabLabel="Go to Competitor Analysis"
+                  onNavigate={handleSectionNavigate}
+                />
               </div>
             )}
 
@@ -864,6 +1263,15 @@ export default function SerpIntelPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Section Bottom Guided Navigation */}
+                <SectionBottomNav
+                  prevTabId="competitor-analysis"
+                  prevTabLabel="Competitor Analysis"
+                  nextTabId="ai-recommendations"
+                  nextTabLabel="Go to Recommendations"
+                  onNavigate={handleSectionNavigate}
+                />
               </div>
             )}
 
@@ -951,6 +1359,15 @@ export default function SerpIntelPage() {
                     )
                   })}
                 </div>
+
+                {/* Section Bottom Guided Navigation */}
+                <SectionBottomNav
+                  prevTabId="topic-coverage"
+                  prevTabLabel="Topic Coverage"
+                  nextTabId="information-gain"
+                  nextTabLabel="Go to Information Gain"
+                  onNavigate={handleSectionNavigate}
+                />
               </div>
             )}
 
@@ -974,19 +1391,21 @@ export default function SerpIntelPage() {
                   </div>
                   <div className="card p-4 border border-[var(--border-subtle)] bg-[var(--bg-card)] text-center">
                     <p className="text-2xl font-black font-mono text-cyan-500 mb-0.5">
-                      {Math.round(competitorProfiles.reduce((acc, c) => acc + safeNum(c?.word_count, 1500), 0) / Math.max(1, competitorProfiles.length)).toLocaleString()}
+                      {wordCounts.length > 0
+                        ? Math.round(wordCounts.reduce((total, value) => total + value, 0) / wordCounts.length).toLocaleString()
+                        : 'Not available'}
                     </p>
                     <p className="text-xs font-mono text-[var(--text-muted)] uppercase tracking-wider">Avg Word Count</p>
                   </div>
                   <div className="card p-4 border border-[var(--border-subtle)] bg-[var(--bg-card)] text-center">
                     <p className="text-2xl font-black font-mono text-emerald-500 mb-0.5">
-                      {safeStr(competitorProfiles[0]?.domain, 'Top Competitor')}
+                      {entityLeader?.domain ?? 'Not available'}
                     </p>
                     <p className="text-xs font-mono text-[var(--text-muted)] uppercase tracking-wider">Entity Leader</p>
                   </div>
                   <div className="card p-4 border border-[var(--border-subtle)] bg-[var(--bg-card)] text-center">
                     <p className="text-2xl font-black font-mono text-purple-500 mb-0.5">
-                      {safeStr(competitorProfiles[0]?.estimated_content_depth, 'High')}
+                      {topContentDepth?.estimated_content_depth || 'Not available'}
                     </p>
                     <p className="text-xs font-mono text-[var(--text-muted)] uppercase tracking-wider">Top Content Depth</p>
                   </div>
@@ -998,7 +1417,7 @@ export default function SerpIntelPage() {
                     const pos = safeNum(cp?.competitor_position, i + 1)
                     const dom = safeStr(cp?.domain, `competitor-${i + 1}.com`)
                     const title = safeStr(cp?.title, `Competitor #${i + 1}`)
-                    const depth = safeStr(cp?.estimated_content_depth, 'Moderate')
+                    const depth = competitorText(cp?.estimated_content_depth, cp?.is_extraction_failed)
                     const depthColor = depth === 'Very High' ? 'text-purple-400 bg-purple-500/10 border-purple-500/30' : depth === 'High' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'text-amber-400 bg-amber-500/10 border-amber-500/30'
                     
                     return (
@@ -1022,71 +1441,96 @@ export default function SerpIntelPage() {
                             )}
                           </div>
                           <h4 className="font-bold text-sm text-[var(--text-primary)] line-clamp-2 leading-snug mb-3">{title}</h4>
-                          <div className="flex flex-wrap gap-1.5">
-                            <span className={`px-2 py-0.5 text-[10px] font-mono rounded border uppercase font-bold ${depthColor}`}>
-                              {depth} Depth
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            {cp?.is_extraction_failed && !cp?.manual_content ? (
+                              <span className="px-2 py-0.5 text-[10px] font-mono rounded border border-red-500/30 bg-red-500/10 text-red-500 font-bold uppercase">
+                                Extraction Failed
+                              </span>
+                            ) : cp?.manual_content ? (
+                              <span className="px-2 py-0.5 text-[10px] font-mono rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 font-bold uppercase flex items-center gap-1">
+                                <CheckCircle2 size={9} /> Manual Analysis Complete
+                              </span>
+                            ) : (
+                              <span className={`px-2 py-0.5 text-[10px] font-mono rounded border uppercase font-bold ${depthColor}`}>
+                                {depth} Depth
+                              </span>
+                            )}
+                            <span className="px-2 py-0.5 text-[10px] font-mono rounded border border-[var(--border-subtle)] bg-[var(--bg-depth)] text-[var(--text-muted)]">
+                              Method: {competitorText(cp?.extraction_method)}
                             </span>
                             <span className="px-2 py-0.5 text-[10px] font-mono rounded border border-[var(--border-subtle)] bg-[var(--bg-depth)] text-[var(--text-muted)]">
-                              {safeStr(cp?.reading_level, '10th Grade')}
+                              Status: {cp?.extraction_status ? safeStr(cp.extraction_status) : competitorMetric(cp?.http_status)}
                             </span>
-                            <span className="px-2 py-0.5 text-[10px] font-mono rounded border border-[var(--border-subtle)] bg-[var(--bg-depth)] text-[var(--text-muted)] truncate max-w-[120px]">
-                              {safeStr(cp?.search_intent, 'Informational')}
+                            <span className="px-2 py-0.5 text-[10px] font-mono rounded border border-[var(--border-subtle)] bg-[var(--bg-depth)] text-[var(--text-muted)]">
+                              Confidence: {competitorMetric(cp?.extraction_confidence, cp?.is_extraction_failed && !cp?.manual_content, '%')}
                             </span>
                           </div>
                         </div>
+
 
                         {/* Computed Quality Scores (Gauge Progress Bars) */}
                         <div className="p-4 bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-xl space-y-3">
-                          <p className="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider font-bold">Computed Quality Scores</p>
+                          <p className="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider font-bold">
+                            {cp?.is_extraction_failed && !cp?.manual_content ? 'Extraction Failed (Content < 300 words)' : cp?.manual_content ? 'Computed Quality Scores (Manual Analysis)' : 'Computed Quality Scores'}
+                          </p>
                           <div className="space-y-2 text-xs">
                             {[
-                              { label: 'Topical Authority', val: safeNum(cp?.topical_authority_score, 75), color: 'bg-[var(--aurora)]' },
-                              { label: 'Semantic Richness', val: safeNum(cp?.semantic_richness_score, 70), color: 'bg-emerald-500' },
-                              { label: 'Content Completeness', val: safeNum(cp?.content_completeness_score, 80), color: 'bg-cyan-500' },
-                              { label: 'Entity Coverage', val: safeNum(cp?.entity_coverage_score, 68), color: 'bg-purple-500' },
-                              { label: 'Structural Quality', val: safeNum(cp?.structural_quality_score, 82), color: 'bg-amber-500' },
-                              { label: 'Information Gain', val: safeNum(cp?.information_gain_score, 65), color: 'bg-blue-500' },
-                            ].map(({ label, val, color }) => (
+                              { label: 'Topical Authority', val: cp?.topical_authority_score, color: 'bg-[var(--aurora)]' },
+                              { label: 'Semantic Richness', val: cp?.semantic_richness_score, color: 'bg-emerald-500' },
+                              { label: 'Content Completeness', val: cp?.content_completeness_score, color: 'bg-cyan-500' },
+                              { label: 'Entity Coverage', val: cp?.entity_coverage_score, color: 'bg-purple-500' },
+                              { label: 'Structural Quality', val: cp?.structural_quality_score, color: 'bg-amber-500' },
+                              { label: 'Information Gain', val: cp?.information_gain_score, color: 'bg-blue-500' },
+                            ].map(({ label, val, color }) => {
+                              const trulyFailed = Boolean(cp?.is_extraction_failed && !cp?.manual_content)
+                              return (
                               <div key={label} className="space-y-1">
                                 <div className="flex justify-between font-mono text-[11px]">
                                   <span className="text-[var(--text-secondary)]">{label}</span>
-                                  <span className="font-bold text-[var(--text-primary)]">{val}%</span>
+                                  <span className="font-bold text-[var(--text-primary)]">{competitorMetric(val, trulyFailed, '%')}</span>
                                 </div>
                                 <div className="w-full h-1.5 bg-[var(--bg-void)] rounded-full overflow-hidden">
-                                  <div className={`h-full ${color} rounded-full`} style={{ width: `${val}%` }} />
+                                  <div className={`h-full ${color} rounded-full`} style={{ width: `${trulyFailed || val === null ? 0 : val}%` }} />
                                 </div>
                               </div>
-                            ))}
+                              )
+                            })}
                           </div>
                         </div>
 
+
                         {/* Structural Metrics Grid */}
-                        <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                          <div className="p-2.5 bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-lg">
-                            <p className="text-[10px] text-[var(--text-muted)] uppercase">Word Count</p>
-                            <p className="font-bold text-[var(--text-primary)]">{safeNum(cp?.word_count).toLocaleString()} words</p>
+                        {(() => {
+                          const trulyFailed = Boolean(cp?.is_extraction_failed && !cp?.manual_content)
+                          return (
+                          <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                            <div className="p-2.5 bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-lg">
+                              <p className="text-[10px] text-[var(--text-muted)] uppercase">Word Count</p>
+                              <p className="font-bold text-[var(--text-primary)]">{competitorMetric(cp?.word_count, trulyFailed, ' words')}</p>
+                            </div>
+                            <div className="p-2.5 bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-lg">
+                              <p className="text-[10px] text-[var(--text-muted)] uppercase">Headings</p>
+                              <p className="font-bold text-[var(--text-primary)]">{trulyFailed || cp?.heading_count === null ? 'Not available' : `${competitorMetric(cp?.heading_count)} (H2: ${competitorMetric(cp?.h2_count)})`}</p>
+                            </div>
+                            <div className="p-2.5 bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-lg">
+                              <p className="text-[10px] text-[var(--text-muted)] uppercase">FAQ Count</p>
+                              <p className="font-bold text-[var(--text-primary)]">{competitorMetric(cp?.faq_count, trulyFailed, ' questions')}</p>
+                            </div>
+                            <div className="p-2.5 bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-lg">
+                              <p className="text-[10px] text-[var(--text-muted)] uppercase">Media &amp; Tables</p>
+                              <p className="font-bold text-[var(--text-primary)]">{trulyFailed || cp?.media_count === null || cp?.table_count === null ? 'Not available' : `${competitorMetric(cp?.media_count)} imgs / ${competitorMetric(cp?.table_count)} tbls`}</p>
+                            </div>
+                            <div className="p-2.5 bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-lg">
+                              <p className="text-[10px] text-[var(--text-muted)] uppercase">Entities Extracted</p>
+                              <p className="font-bold text-[var(--text-primary)]">{competitorMetric(cp?.entity_count, trulyFailed, ' entities')}</p>
+                            </div>
+                            <div className="p-2.5 bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-lg">
+                              <p className="text-[10px] text-[var(--text-muted)] uppercase">Density &amp; Links</p>
+                              <p className="font-bold text-[var(--text-primary)]">{trulyFailed || !cp?.semantic_density || cp?.internal_links === null ? 'Not available' : `${cp.semantic_density} | ${competitorMetric(cp.internal_links)} links`}</p>
+                            </div>
                           </div>
-                          <div className="p-2.5 bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-lg">
-                            <p className="text-[10px] text-[var(--text-muted)] uppercase">Headings</p>
-                            <p className="font-bold text-[var(--text-primary)]">{safeNum(cp?.heading_count)} (H2: {safeNum(cp?.h2_count)})</p>
-                          </div>
-                          <div className="p-2.5 bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-lg">
-                            <p className="text-[10px] text-[var(--text-muted)] uppercase">FAQ Count</p>
-                            <p className="font-bold text-[var(--text-primary)]">{safeNum(cp?.faq_count)} questions</p>
-                          </div>
-                          <div className="p-2.5 bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-lg">
-                            <p className="text-[10px] text-[var(--text-muted)] uppercase">Media & Tables</p>
-                            <p className="font-bold text-[var(--text-primary)]">{safeNum(cp?.media_count)} imgs / {safeNum(cp?.table_count)} tbls</p>
-                          </div>
-                          <div className="p-2.5 bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-lg">
-                            <p className="text-[10px] text-[var(--text-muted)] uppercase">Entities Extracted</p>
-                            <p className="font-bold text-[var(--text-primary)]">{safeNum(cp?.entity_count)} entities</p>
-                          </div>
-                          <div className="p-2.5 bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-lg">
-                            <p className="text-[10px] text-[var(--text-muted)] uppercase">Density & Links</p>
-                            <p className="font-bold text-[var(--text-primary)]">{safeStr(cp?.semantic_density, '1.5%')} | {safeNum(cp?.internal_links)} links</p>
-                          </div>
-                        </div>
+                          )
+                        })()}
 
                         {/* Primary Entities */}
                         <div>
@@ -1156,41 +1600,41 @@ export default function SerpIntelPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[var(--border-subtle)] text-[var(--text-secondary)]">
-                        <tr>
+                      <tr>
                           <td className="p-3.5 font-bold text-[var(--text-primary)]">Content Depth Rating</td>
                           {competitorProfiles.map((cp, i) => (
-                            <td key={i} className="p-3.5 font-bold text-[var(--aurora)]">{safeStr(cp?.estimated_content_depth, 'Moderate')}</td>
+                            <td key={i} className="p-3.5 font-bold text-[var(--aurora)]">{competitorText(cp?.estimated_content_depth, Boolean(cp?.is_extraction_failed && !cp?.manual_content))}</td>
                           ))}
                         </tr>
                         <tr>
                           <td className="p-3.5 font-bold text-[var(--text-primary)]">Word Count</td>
                           {competitorProfiles.map((cp, i) => (
-                            <td key={i} className="p-3.5">{safeNum(cp?.word_count).toLocaleString()} words</td>
+                            <td key={i} className="p-3.5">{competitorMetric(cp?.word_count, Boolean(cp?.is_extraction_failed && !cp?.manual_content), ' words')}</td>
                           ))}
                         </tr>
                         <tr>
                           <td className="p-3.5 font-bold text-[var(--text-primary)]">Headings Breakdown</td>
-                          {competitorProfiles.map((cp, i) => (
-                            <td key={i} className="p-3.5">H1: {safeNum(cp?.h1_count, 1)} | H2: {safeNum(cp?.h2_count, 4)} | H3: {safeNum(cp?.h3_count, 2)}</td>
-                          ))}
+                          {competitorProfiles.map((cp, i) => { const tf = Boolean(cp?.is_extraction_failed && !cp?.manual_content); return (
+                            <td key={i} className="p-3.5">{tf || cp?.h1_count === null || cp?.h2_count === null || cp?.h3_count === null ? 'Not available' : `H1: ${competitorMetric(cp.h1_count)} | H2: ${competitorMetric(cp.h2_count)} | H3: ${competitorMetric(cp.h3_count)}`}</td>
+                          )})}
                         </tr>
                         <tr>
                           <td className="p-3.5 font-bold text-[var(--text-primary)]">Paragraph Count</td>
                           {competitorProfiles.map((cp, i) => (
-                            <td key={i} className="p-3.5">{safeNum(cp?.paragraph_count)} paragraphs</td>
+                            <td key={i} className="p-3.5">{competitorMetric(cp?.paragraph_count, Boolean(cp?.is_extraction_failed && !cp?.manual_content), ' paragraphs')}</td>
                           ))}
                         </tr>
                         <tr>
-                          <td className="p-3.5 font-bold text-[var(--text-primary)]">Reading Level & Ease</td>
-                          {competitorProfiles.map((cp, i) => (
-                            <td key={i} className="p-3.5">{safeStr(cp?.reading_level, '10th Grade')} ({safeNum(cp?.readability_score, 65)}/100 Ease)</td>
-                          ))}
+                          <td className="p-3.5 font-bold text-[var(--text-primary)]">Reading Level &amp; Ease</td>
+                          {competitorProfiles.map((cp, i) => { const tf = Boolean(cp?.is_extraction_failed && !cp?.manual_content); return (
+                            <td key={i} className="p-3.5">{tf || !cp?.reading_level || cp?.readability_score === null ? 'Not available' : `${cp.reading_level} (${competitorMetric(cp.readability_score)}/100 Ease)`}</td>
+                          )})}
                         </tr>
                         <tr>
                           <td className="p-3.5 font-bold text-[var(--text-primary)]">Extracted Entity Count</td>
-                          {competitorProfiles.map((cp, i) => (
-                            <td key={i} className="p-3.5 font-bold text-emerald-400">{safeNum(cp?.entity_count)} entities ({safeStr(cp?.entity_diversity, 'High')} diversity)</td>
-                          ))}
+                          {competitorProfiles.map((cp, i) => { const tf = Boolean(cp?.is_extraction_failed && !cp?.manual_content); return (
+                            <td key={i} className="p-3.5 font-bold text-emerald-400">{tf ? 'Entity analysis unavailable' : cp?.entity_count === null || !cp?.entity_diversity ? 'Not available' : `${competitorMetric(cp.entity_count)} entities (${cp.entity_diversity} diversity)`}</td>
+                          )})}
                         </tr>
                         <tr>
                           <td className="p-3.5 font-bold text-[var(--text-primary)]">Primary Entities</td>
@@ -1207,49 +1651,59 @@ export default function SerpIntelPage() {
                         <tr>
                           <td className="p-3.5 font-bold text-[var(--text-primary)]">FAQ / User Questions</td>
                           {competitorProfiles.map((cp, i) => (
-                            <td key={i} className="p-3.5">{safeNum(cp?.faq_count)} question lines</td>
+                            <td key={i} className="p-3.5">{competitorMetric(cp?.faq_count, Boolean(cp?.is_extraction_failed && !cp?.manual_content), ' question lines')}</td>
                           ))}
                         </tr>
                         <tr>
-                          <td className="p-3.5 font-bold text-[var(--text-primary)]">Data Tables & Lists</td>
-                          {competitorProfiles.map((cp, i) => (
-                            <td key={i} className="p-3.5">{safeNum(cp?.table_count)} tables | {safeNum(cp?.list_count)} lists</td>
-                          ))}
+                          <td className="p-3.5 font-bold text-[var(--text-primary)]">Data Tables &amp; Lists</td>
+                          {competitorProfiles.map((cp, i) => { const tf = Boolean(cp?.is_extraction_failed && !cp?.manual_content); return (
+                            <td key={i} className="p-3.5">{tf || cp?.table_count === null || cp?.list_count === null ? 'Not available' : `${competitorMetric(cp.table_count)} tables | ${competitorMetric(cp.list_count)} lists`}</td>
+                          )})}
                         </tr>
                         <tr>
-                          <td className="p-3.5 font-bold text-[var(--text-primary)]">Media & Visual Assets</td>
+                          <td className="p-3.5 font-bold text-[var(--text-primary)]">Media &amp; Visual Assets</td>
                           {competitorProfiles.map((cp, i) => (
-                            <td key={i} className="p-3.5">{safeNum(cp?.media_count)} images/vectors</td>
+                            <td key={i} className="p-3.5">{competitorMetric(cp?.media_count, Boolean(cp?.is_extraction_failed && !cp?.manual_content), ' images/vectors')}</td>
                           ))}
                         </tr>
                         <tr>
                           <td className="p-3.5 font-bold text-[var(--text-primary)]">Internal / External Links</td>
-                          {competitorProfiles.map((cp, i) => (
-                            <td key={i} className="p-3.5">{safeNum(cp?.internal_links)} int / {safeNum(cp?.external_links)} ext</td>
-                          ))}
+                          {competitorProfiles.map((cp, i) => { const tf = Boolean(cp?.is_extraction_failed && !cp?.manual_content); return (
+                            <td key={i} className="p-3.5">{tf || cp?.internal_links === null || cp?.external_links === null ? 'Not available' : `${competitorMetric(cp.internal_links)} int / ${competitorMetric(cp.external_links)} ext`}</td>
+                          )})}
                         </tr>
                         <tr>
                           <td className="p-3.5 font-bold text-[var(--text-primary)]">Topical Authority Score</td>
                           {competitorProfiles.map((cp, i) => (
-                            <td key={i} className="p-3.5 font-bold text-purple-400">{safeNum(cp?.topical_authority_score, 75)} / 100</td>
+                            <td key={i} className="p-3.5 font-bold text-purple-400">{competitorMetric(cp?.topical_authority_score, Boolean(cp?.is_extraction_failed && !cp?.manual_content), ' / 100')}</td>
                           ))}
                         </tr>
                         <tr>
                           <td className="p-3.5 font-bold text-[var(--text-primary)]">Semantic Richness Score</td>
                           {competitorProfiles.map((cp, i) => (
-                            <td key={i} className="p-3.5 font-bold text-cyan-400">{safeNum(cp?.semantic_richness_score, 70)} / 100</td>
+                            <td key={i} className="p-3.5 font-bold text-cyan-400">{competitorMetric(cp?.semantic_richness_score, Boolean(cp?.is_extraction_failed && !cp?.manual_content), ' / 100')}</td>
                           ))}
                         </tr>
                         <tr>
                           <td className="p-3.5 font-bold text-[var(--text-primary)]">Information Gain Score</td>
                           {competitorProfiles.map((cp, i) => (
-                            <td key={i} className="p-3.5 font-bold text-yellow-400">{safeNum(cp?.information_gain_score, 65)} / 100</td>
+                            <td key={i} className="p-3.5 font-bold text-yellow-400">{competitorMetric(cp?.information_gain_score, Boolean(cp?.is_extraction_failed && !cp?.manual_content), ' / 100')}</td>
                           ))}
                         </tr>
                       </tbody>
+
                     </table>
                   </div>
                 </AnalysisSection>
+
+                {/* Section Bottom Guided Navigation */}
+                <SectionBottomNav
+                  prevTabId="topic-coverage"
+                  prevTabLabel="Topic Coverage"
+                  nextTabId="semantic-clusters"
+                  nextTabLabel="Go to Semantic Topic Clusters"
+                  onNavigate={handleSectionNavigate}
+                />
               </div>
             )}
 
@@ -1349,16 +1803,25 @@ export default function SerpIntelPage() {
                     No recommendations generated. Run a full analysis to generate evidence-based recommendations.
                   </div>
                 )}
+
+                {/* Section Bottom Guided Navigation */}
+                <SectionBottomNav
+                  prevTabId="semantic-clusters"
+                  prevTabLabel="Semantic Topic Clusters"
+                  nextTabId="serp-timeline"
+                  nextTabLabel="Go to SERP Timeline"
+                  onNavigate={handleSectionNavigate}
+                />
               </div>
             )}
 
             {/* TAB 7: TOPIC MAP (GRAPH) */}
-            {activeTab === 'topic-map' && (
+            {activeTab === 'serp-timeline' && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-xl font-bold text-[var(--text-primary)] flex items-center gap-2">
-                      <MapPin size={20} className="text-[var(--aurora)]" /> Interactive Topic Map Graph
+                      <MapPin size={20} className="text-[var(--aurora)]" /> SERP Timeline (Interactive Graph)
                     </h3>
                     <p className="text-xs text-[var(--text-secondary)]">Visualizing entity relationships and topic coverage hierarchy.</p>
                   </div>
@@ -1441,6 +1904,15 @@ export default function SerpIntelPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Section Bottom Guided Navigation */}
+                <SectionBottomNav
+                  prevTabId="ai-recommendations"
+                  prevTabLabel="Recommendations"
+                  nextTabId="executive-summary"
+                  nextTabLabel="Go to Executive Summary"
+                  onNavigate={handleSectionNavigate}
+                />
               </div>
             )}
 
@@ -1488,7 +1960,7 @@ export default function SerpIntelPage() {
                         <Activity size={16} className="text-[var(--aurora)]" /> SERP Overview
                       </h4>
                       <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                        Top ranking competitors average <span className="font-bold text-[var(--text-primary)]">{safeNum(semanticBaseline?.avg_word_count, 1500).toLocaleString()} words</span> with <span className="font-bold text-[var(--text-primary)]">{safeStr(readability?.average_reading_level, 'Standard')}</span> readability level.
+                      Top ranking competitors average <span className="font-bold text-[var(--text-primary)]">{optionalNum(semanticBaseline?.avg_word_count) === null ? 'Not available' : `${optionalNum(semanticBaseline?.avg_word_count)?.toLocaleString()} words`}</span> with <span className="font-bold text-[var(--text-primary)]">{safeStr(readability?.average_reading_level, 'Not available')}</span> readability level.
                       </p>
                     </div>
 
@@ -1614,40 +2086,6 @@ export default function SerpIntelPage() {
                   </div>
                 </AnalysisSection>
 
-                {/* Developer Pipeline Diagnostics Debug Panel */}
-                <AnalysisSection title="🛠️ Developer Pipeline Diagnostics (Dev Mode)" icon={Sliders} defaultOpen={false}>
-                  <div className="space-y-4 text-xs font-mono">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <div className="p-3 bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-lg">
-                        <p className="text-[var(--text-muted)] font-bold uppercase text-[10px]">SERP Pages Collected</p>
-                        <p className="text-lg font-bold text-[var(--aurora)]">{serpResults.length} / 3 Pages</p>
-                      </div>
-                      <div className="p-3 bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-lg">
-                        <p className="text-[var(--text-muted)] font-bold uppercase text-[10px]">Entities Extracted</p>
-                        <p className="text-lg font-bold text-emerald-400">{safeNum(semanticBaseline?.total_entities, 0)} Total</p>
-                      </div>
-                      <div className="p-3 bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-lg">
-                        <p className="text-[var(--text-muted)] font-bold uppercase text-[10px]">Clusters Generated</p>
-                        <p className="text-lg font-bold text-cyan-400">{topicClusters.length} Clusters</p>
-                      </div>
-                      <div className="p-3 bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-lg">
-                        <p className="text-[var(--text-muted)] font-bold uppercase text-[10px]">Execution Duration</p>
-                        <p className="text-lg font-bold text-purple-400">{safeNum(report?.processing_time_ms, 0)} ms</p>
-                      </div>
-                    </div>
-
-                    <div className="p-4 bg-[var(--bg-depth)] border border-[var(--border-subtle)] rounded-xl space-y-2">
-                      <p className="font-bold text-[var(--text-primary)]">Pipeline Stage Diagnostics & Execution Details:</p>
-                      <p className="text-[var(--text-secondary)]">• Target Keyword: <span className="text-[var(--aurora)] font-bold">{keyword}</span></p>
-                      <p className="text-[var(--text-secondary)]">• Analysis ID / Version: <span className="text-emerald-400 font-bold">{report?.analysis_id || 'N/A'} (Version v{report?.analysis_version || 1})</span></p>
-                      <p className="text-[var(--text-secondary)]">• Cache Mode: <span className="text-amber-400 font-bold">{report?.is_cached ? 'Historical Snapshot (Cached)' : 'Fresh SERP Fetch & NLP Baseline Pipeline'}</span></p>
-                      <p className="text-[var(--text-secondary)]">• Dynamic Topic Coverage Score: <span className="text-cyan-400 font-bold">{coverageScore}% (Core: {safeArray(topicCoverage?.covered_core_topics).length}, Supporting: {safeArray(topicCoverage?.covered_supporting_topics).length})</span></p>
-                      <p className="text-[var(--text-secondary)]">• Dynamic Knowledge Gap Score: <span className="text-red-400 font-bold">{gapScore}% ({totalGapItems} Gap Items Detected)</span></p>
-                      <p className="text-[var(--text-secondary)]">• Dynamic Opportunity Score: <span className="text-yellow-400 font-bold">{opportunityScore}% ({safeNum(informationGain?.total_unique_concepts, 0)} Differentiation Concepts)</span></p>
-                    </div>
-                  </div>
-                </AnalysisSection>
-
                 <div className="flex justify-end gap-4">
                   <button
                     onClick={() => {
@@ -1666,8 +2104,70 @@ export default function SerpIntelPage() {
                     <Download size={16} /> Export JSON / Report
                   </button>
                 </div>
+
+                {/* Section Bottom Guided Navigation */}
+                <SectionBottomNav
+                  prevTabId="serp-timeline"
+                  prevTabLabel="SERP Timeline"
+                  nextTabId="overview"
+                  nextTabLabel="Back to SERP Overview"
+                  isBackToTop={true}
+                  onNavigate={handleSectionNavigate}
+                />
               </div>
             )}
+
+            {/* ─── SCORE FORMULA & EVIDENCE BREAKDOWN MODAL (Requirement #2) ──── */}
+            <AnimatePresence>
+              {selectedScoreFormula && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+                  onClick={() => setSelectedScoreFormula(null)}
+                >
+                  <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.9, opacity: 0 }}
+                    className="bg-[var(--bg-card)] border border-[var(--aurora)]/30 max-w-lg w-full p-6 rounded-2xl shadow-2xl space-y-4"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
+                      <h3 className="text-lg font-bold text-[var(--text-primary)] flex items-center gap-2">
+                        <Info size={18} className="text-[var(--aurora)]" /> {selectedScoreFormula.title} Breakdown
+                      </h3>
+                      <button onClick={() => setSelectedScoreFormula(null)} className="text-[var(--text-muted)] hover:text-white">✕</button>
+                    </div>
+
+                    <div className="space-y-3 text-sm">
+                      <div className="bg-[var(--bg-depth)] p-3 rounded-xl border border-[var(--border-subtle)]">
+                        <p className="text-xs font-mono text-[var(--text-muted)] uppercase tracking-wider mb-1">Score Formula:</p>
+                        <p className="font-mono text-xs text-[var(--aurora)] font-bold">{selectedScoreFormula.formula}</p>
+                      </div>
+
+                      <div className="bg-[var(--bg-depth)] p-3 rounded-xl border border-[var(--border-subtle)]">
+                        <p className="text-xs font-mono text-[var(--text-muted)] uppercase tracking-wider mb-1">Evidence Used:</p>
+                        <p className="text-xs text-[var(--text-secondary)]">{selectedScoreFormula.evidence}</p>
+                      </div>
+
+                      <div className="bg-[var(--bg-depth)] p-3 rounded-xl border border-[var(--border-subtle)] flex items-center justify-between">
+                        <span className="text-xs font-mono text-[var(--text-muted)]">Confidence Rating:</span>
+                        <span className="font-mono font-bold text-emerald-400">{selectedScoreFormula.confidence}% High Confidence</span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setSelectedScoreFormula(null)}
+                      className="w-full py-2.5 bg-[var(--aurora)] text-white font-bold rounded-xl text-sm hover:opacity-90 transition-opacity"
+                    >
+                      Close Breakdown
+                    </button>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
           </motion.div>
         )}

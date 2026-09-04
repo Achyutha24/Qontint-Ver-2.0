@@ -14,7 +14,7 @@ import logging
 import time
 import uuid
 from typing import Any
-from datetime import datetime
+from services.serp_intel.utils import make_json_serializable
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -59,6 +59,7 @@ async def run_unified_analysis(
     country: str = "us",
     language: str = "en",
     device: str = "desktop",
+    force_refresh: bool = False,
     request_id: str = "",
 ) -> dict[str, Any]:
     """
@@ -81,6 +82,7 @@ async def run_unified_analysis(
         language=language,
         device=device,
         db=db,
+        force_refresh=force_refresh,
         request_id=req_id,
     )
 
@@ -196,12 +198,13 @@ async def run_unified_analysis(
     elapsed_ms = int((time.perf_counter() - start) * 1000)
 
     # ── 5. Return response shaped for normalizeAnalyzeResponse ────────────────
-    return {
+    return make_json_serializable({
         # Identity — always the user's keyword, never a pipeline fallback
         "keyword":                keyword,
         "schema_version":         "2.0",
         "request_id":             req_id,
-        "generated_at":           datetime.utcnow().isoformat(),
+        "generated_at":           serp_intel.get("generated_at"),
+        "serp_refreshed_at":      serp_intel.get("serp_refreshed_at"),
 
         # Scores — top-level, matching frontend normalizeAnalyzeResponse expectations
         "novelty":                novelty_block,
@@ -233,6 +236,12 @@ async def run_unified_analysis(
             "overall_score":       raw_analysis.get("overall_score", {}),
             "search_intent":       raw_analysis.get("search_intent", {}),
             "serp_features":       raw_analysis.get("serp_features", {}),
+            "competitor_profiles": raw_analysis.get("competitor_profiles", []),
+            "semantic_baseline":   raw_analysis.get("semantic_baseline", {}),
+            "information_gain":    raw_analysis.get("information_gain", {}),
+            "advanced_stats":      raw_analysis.get("advanced_stats", {}),
+            "graph_data":          raw_analysis.get("graph_data", {}),
+            "coverage_score":      raw_analysis.get("coverage_score"),
         },
 
         "metadata": {
@@ -243,4 +252,4 @@ async def run_unified_analysis(
             "provider":           "Gemini-Flash + Deterministic NLP",
             "processing_time_ms": elapsed_ms,
         },
-    }
+    })

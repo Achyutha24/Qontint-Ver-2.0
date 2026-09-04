@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Search, Download, CheckCircle, AlertTriangle, Lightbulb, BarChart2, MessageSquare, Box, Rocket, Info, ChevronRight } from 'lucide-react'
+import { X, Search, Download, CheckCircle, AlertTriangle, Lightbulb, BarChart2, Rocket, ChevronRight } from 'lucide-react'
 import CinematicLoader from './CinematicLoader'
 import ScoreCard from './ScoreCard'
 import type { AnalyzeResult } from './ResultsPanel'

@@ -9,7 +9,8 @@ export interface ReportItem {
   id: string
   title: string
   keyword: string
-  type: 'Analyze' | 'Generated Content' | 'SERP Intelligence' | 'Knowledge Graph' | 'Workspace' | 'AI Assistant'
+  type: 'Analyze' | 'Generated Content' | 'SERP Intelligence' | 'Knowledge Graph' | 'ERP Graph' | 'Workspace' | 'AI Assistant'
+
   category: string
   domain: string
   createdAt: string
@@ -44,7 +45,7 @@ export function getReportsFromStorage(): ReportItem[] {
 export function saveReportToRepository(item: Partial<ReportItem>): ReportItem {
   const existing = getReportsFromStorage()
   
-  const score = item.score ?? 85
+  const score = item.score ?? 0
   const grade = score >= 90 ? 'A+' : score >= 80 ? 'A' : score >= 70 ? 'B' : 'C'
 
   const newReport: ReportItem = {
@@ -58,7 +59,7 @@ export function saveReportToRepository(item: Partial<ReportItem>): ReportItem {
     updatedAt: new Date().toISOString(),
     score: Math.round(score),
     grade: item.grade || grade,
-    rank: item.rank || '#3',
+    rank: item.rank || '—',
     status: item.status || 'Completed',
     isFavorite: item.isFavorite || false,
     isPinned: item.isPinned || false,

@@ -41,27 +41,32 @@ interface Props {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  KEYWORD:    '#F59E0B', // Gold
-  CONCEPT:    '#06B6D4', // Cyan
-  CLUSTER:    '#6366F1', // Indigo/Purple
-  TECHNOLOGY: '#8B5CF6', // Purple
-  ORG:        '#F43F5E', // Rose/Amber
-  COMPETITOR: '#EF4444', // Red
-  PRODUCT:    '#10B981', // Emerald
-  STANDARD:   '#10B981',
-  DEFAULT:    '#3B82F6',
+  PLATFORM:       '#F97316', // Aurora Orange
+  MODULE:         '#2563EB', // Royal Blue
+  PROCESS:        '#06B6D4', // Cyan
+  TECHNOLOGY:     '#8B5CF6', // Purple
+  SECURITY:       '#EF4444', // Red
+  INTEGRATION:    '#10B981', // Emerald Green
+  IMPLEMENTATION: '#F59E0B', // Amber
+  VENDOR:         '#64748B', // Slate Gray
+  DEFAULT:        '#3B82F6',
 }
 
 function getColor(type: string | undefined): string {
   if (!type) return TYPE_COLORS.DEFAULT
   const key = type.toUpperCase()
   if (TYPE_COLORS[key]) return TYPE_COLORS[key]
-  if (key.includes('KEYWORD')) return TYPE_COLORS.KEYWORD
-  if (key.includes('CLUSTER')) return TYPE_COLORS.CLUSTER
-  if (key.includes('COMPETITOR') || key.includes('ORG')) return TYPE_COLORS.ORG
+  if (key.includes('PLATFORM')) return TYPE_COLORS.PLATFORM
+  if (key.includes('MODULE')) return TYPE_COLORS.MODULE
+  if (key.includes('PROCESS')) return TYPE_COLORS.PROCESS
   if (key.includes('TECH')) return TYPE_COLORS.TECHNOLOGY
-  return TYPE_COLORS.CONCEPT
+  if (key.includes('SEC') || key.includes('GOV')) return TYPE_COLORS.SECURITY
+  if (key.includes('INT')) return TYPE_COLORS.INTEGRATION
+  if (key.includes('IMPL') || key.includes('MIG')) return TYPE_COLORS.IMPLEMENTATION
+  if (key.includes('VENDOR') || key.includes('ORG')) return TYPE_COLORS.VENDOR
+  return TYPE_COLORS.DEFAULT
 }
+
 
 export default function Graph2D({ nodes, edges, onNodeHover, onNodeClick, selectedId, layoutName = 'fcose' }: Props) {
   const { theme } = useTheme()
@@ -126,7 +131,7 @@ export default function Graph2D({ nodes, edges, onNodeHover, onNodeClick, select
         'target-arrow-color': isDark ? '#475569' : '#94a3b8',
         'arrow-scale': 0.8,
         'opacity': 0.5,
-        'label': 'data(label)',
+        'label': '',
         'font-size': '8px',
         'color': isDark ? '#64748b' : '#94a3b8',
         'text-rotation': 'autorotate',
@@ -161,20 +166,23 @@ export default function Graph2D({ nodes, edges, onNodeHover, onNodeClick, select
 
   const layout = useMemo(() => {
     if (currentLayout === 'fcose') {
+      const nodeCount = nodes.length
+      const dense = nodeCount > 120
       return {
         name: 'fcose',
-        animate: true,
-        animationDuration: 400,
-        quality: 'default',
-        randomize: false,
+        // Do not animate the layout. Cytoscape animation + a 2,000-iteration
+        // force solve was blocking the browser during 3D → 2D transitions.
+        animate: false,
+        quality: dense ? 'draft' : 'default',
+        randomize: true,
         fit: true,
         padding: 30,
-        nodeRepulsion: 5000,
-        idealEdgeLength: 90,
-        edgeElasticity: 0.45,
+        nodeRepulsion: dense ? 3500 : 5000,
+        idealEdgeLength: dense ? 70 : 90,
+        edgeElasticity: dense ? 0.35 : 0.45,
         nestingFactor: 0.1,
-        gravity: 0.25,
-        numIter: 2000,
+        gravity: dense ? 0.45 : 0.25,
+        numIter: dense ? 280 : 500,
       }
     }
     if (currentLayout === 'dagre') {
@@ -199,7 +207,7 @@ export default function Graph2D({ nodes, edges, onNodeHover, onNodeClick, select
       }
     }
     return { name: currentLayout, animate: true, animationDuration: 400 }
-  }, [currentLayout])
+  }, [currentLayout, nodes.length])
 
   useEffect(() => {
     if (!cyRef.current) return
@@ -216,16 +224,10 @@ export default function Graph2D({ nodes, edges, onNodeHover, onNodeClick, select
         
         cy.elements().difference(selected).difference(neighbors).addClass('faded')
         
-        cy.animate({
-          fit: { eles: selected.union(neighbors), padding: 50 },
-          duration: 400
-        })
+        cy.fit(selected.union(neighbors), 50)
       }
     } else {
-      cy.animate({
-        fit: { padding: 30, eles: cy.elements() },
-        duration: 400
-      })
+      cy.fit(cy.elements(), 30)
     }
   }, [selectedId])
 
@@ -289,7 +291,8 @@ export default function Graph2D({ nodes, edges, onNodeHover, onNodeClick, select
             onNodeHover(null, 0, 0)
           })
         }}
-        wheelSensitivity={0.2}
+        // Cytoscape should not continuously animate a dense graph.
+        wheelSensitivity={0.15}
       />
     </div>
   )

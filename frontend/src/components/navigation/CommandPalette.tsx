@@ -53,7 +53,7 @@ export default function CommandPalette() {
     { id: 'generate',    label: 'Generate',            description: 'AI Content Studio',                icon: Zap,            category: 'Pages',    action: () => go('/app/generate'),     keywords: ['write', 'article', 'create', 'ai'] },
     { id: 'intelligence',label: 'Intelligence',        description: 'Query intelligence engine',        icon: Brain,          category: 'Pages',    action: () => go('/app/intelligence'), keywords: ['query', 'insight'] },
     { id: 'serp',        label: 'SERP Intelligence',   description: 'Live SERP analysis',               icon: Globe,          category: 'Pages',    action: () => go('/app/serp-intel'),   keywords: ['serp', 'search', 'rank', 'google'] },
-    { id: 'graph',       label: 'Knowledge Graph',     description: 'Entity relationship visualization',icon: Network,        category: 'Pages',    action: () => go('/app/graph'),        keywords: ['entity', 'graph', 'knowledge', 'neo4j'] },
+    { id: 'graph',       label: 'ERP Graph',           description: 'Explore ERP platform and process relationships', icon: Network, category: 'Pages', action: () => go('/app/graph'), keywords: ['erp', 'graph', 'sap', 'oracle', 'procurement', 'platform'] },
     { id: 'reports',     label: 'Reports',             description: 'Executive intelligence reports',   icon: FileText,       category: 'Pages',    action: () => go('/app/reports'),      keywords: ['report', 'executive', 'audit'] },
     { id: 'workspace',   label: 'Workspace',           description: 'Project management hub',           icon: Briefcase,      category: 'Pages',    action: () => go('/app/workspace'),    keywords: ['project', 'manage', 'workspace'] },
     { id: 'youtube',     label: 'YouTube',             description: 'YouTube content intelligence',     icon: Video,          category: 'Pages',    action: () => go('/app/youtube'),      keywords: ['video', 'youtube', 'yt'] },
@@ -63,7 +63,8 @@ export default function CommandPalette() {
     { id: 'cmd-generate',label: 'Generate Article',    description: 'Create AI-powered content',        icon: Zap,            category: 'Commands', action: () => go('/app/generate'),     keywords: ['write', 'generate', 'article'] },
     { id: 'cmd-report',  label: 'Create Report',       description: 'Generate executive audit report',  icon: FileText,       category: 'Commands', action: () => go('/app/reports'),      keywords: ['create', 'report'] },
     { id: 'cmd-serp',    label: 'Run SERP Analysis',   description: 'Search live SERP competitors',     icon: Globe,          category: 'Commands', action: () => go('/app/serp-intel'),   keywords: ['serp', 'live', 'competitors'] },
-    { id: 'cmd-graph',   label: 'Open Knowledge Graph',description: 'Visualize entity relationships',   icon: Network,        category: 'Commands', action: () => go('/app/graph'),        keywords: ['open', 'graph', 'entities'] },
+    { id: 'cmd-graph',   label: 'Open ERP Graph',      description: 'Explore ERP platform and process relationships', icon: Network, category: 'Commands', action: () => go('/app/graph'), keywords: ['open', 'graph', 'erp', 'entities'] },
+
     { id: 'cmd-ai',      label: 'Open AI Assistant',   description: 'Ask the Enterprise AI Copilot',    icon: Sparkles,       category: 'Commands', action: () => { setCommandPaletteOpen(false); setQuery('') }, keywords: ['ai', 'copilot', 'assistant', 'ask'] },
   ], [])
 

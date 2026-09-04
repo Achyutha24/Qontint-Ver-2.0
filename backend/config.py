@@ -43,7 +43,7 @@ class Settings(BaseSettings):
 
     # ── Analyze fast-path (target <15s end-to-end) ────────────────────────────
     ANALYZE_SERP_MAX_RESULTS: int = 4
-    ANALYZE_SERP_TIMEOUT_MS: int = 5000
+    ANALYZE_SERP_TIMEOUT_MS: int = 8000
     ANALYZE_SERP_BODY_MAX_CHARS: int = 8_000
     ANALYZE_MAX_SERP_DOCS: int = 5
     ANALYZE_NLP_MAX_LEN: int = 1_500

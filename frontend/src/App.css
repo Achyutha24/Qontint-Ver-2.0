@@ -1,7 +1,7 @@
 /* App-level component styles */
 
 /* Nav */
-a { cursor: none; }
+/* Keep the native cursor visible for accessible navigation and links. */
 
 /* Graph canvas */
 .graph-canvas-container {

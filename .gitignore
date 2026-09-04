@@ -7,6 +7,8 @@
 .env.test.local
 .env.production.local
 *.env
+!.env.example
+!**/.env.example
 
 # Dependencies
 node_modules/
@@ -28,11 +30,14 @@ htmlcov/
 .mypy_cache/
 .tox/
 
-# Databases
+# Databases & Backups
 *.sqlite
+*.sqlite3
 *.db
 *.db-shm
 *.db-wal
+*.db.bak
+*.bak
 
 # Build outputs
 dist/
@@ -49,8 +54,13 @@ Thumbs.db
 *.swp
 *.swo
 
+# Logs
+*.log
+logs/
+backend/logs/
+
 # Project specific
 backend/ml_models/
-backend/logs/
 frontend/coverage/
 .gemini/
+backend/tests/benchmark_history.json

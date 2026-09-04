@@ -46,6 +46,9 @@ import SerpIntelPage from './pages/SerpIntelPage'
 import ReportsPage from './pages/ReportsPage'
 import WorkspacePage from './pages/WorkspacePage'
 import AnalyzeReportPage from './pages/AnalyzeReportPage'
+import SettingsPage from './pages/SettingsPage'
+import HelpDocsPage from './pages/HelpDocsPage'
+import AboutQontintPage from './pages/AboutQontintPage'
 
 export default function AppRoutes() {
   return (
@@ -79,6 +82,9 @@ export default function AppRoutes() {
           <Route path="/app/youtube" element={<YouTubePage />} />
           <Route path="/app/keywords" element={<KeywordsPage />} />
           <Route path="/app/dashboard" element={<DashboardPage />} />
+          <Route path="/app/settings" element={<SettingsPage />} />
+          <Route path="/app/help" element={<HelpDocsPage />} />
+          <Route path="/app/about" element={<AboutQontintPage />} />
         </Route>
       </Route>
 

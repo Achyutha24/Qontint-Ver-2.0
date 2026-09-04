@@ -149,11 +149,20 @@ export default function AnalyzePage() {
       const normalized = normalizeAnalyzeResponse(data as Record<string, unknown>)
       setResult(normalized)
 
+      // Keep the assistant/report context aligned with the actual Analyze result.
+      // The API returns authority + novelty as 0–1 values rather than a top-level
+      // seoScore, so persist the same transparent composite used by the report
+      // repository instead of leaving the assistant with a misleading null.
+      const derivedSeoScore = Math.round(
+        ((normalized.authority?.authority_score ?? 0) * 0.5 +
+          (normalized.novelty?.novelty_score ?? 0) * 0.5) * 100
+      )
+
       const snapshot = {
         keyword,
         vertical: domain,
         analyzedAt: new Date().toISOString(),
-        result: normalized,
+        result: { ...normalized, seoScore: derivedSeoScore },
         raw: data,
       }
       localStorage.setItem('qontint_last_analysis', JSON.stringify(snapshot))
@@ -184,9 +193,9 @@ export default function AnalyzePage() {
       <canvas ref={canvasRef} className="fixed inset-0 w-full h-full pointer-events-none z-0 opacity-40" />
 
       <PageHeader
-        title="Neural Dissection Chamber"
-        subtitle="Paste your content and target keyword. Qontint extracts entities, scores semantic novelty against live SERP data, and predicts your ranking position with confidence intervals."
-        badge="Enterprise Analyze Workspace"
+        title="Content Analyzer"
+        subtitle="Enter your target keyword and content. Qontint runs a live SERP intelligence pipeline — extracting entities, scoring semantic authority, and revealing keyword-specific content gaps against top-ranking competitors."
+        badge="SERP Intelligence"
         icon={Cpu}
       />
 
@@ -262,17 +271,18 @@ export default function AnalyzePage() {
             className="lg:col-span-2 space-y-4"
           >
             <div className="card p-5">
-              <h3 className="font-display font-semibold text-[var(--text-primary)] mb-3">Pipeline Modules</h3>
+              <h3 className="font-display font-semibold text-[var(--text-primary)] mb-1">Analysis Pipeline</h3>
+              <p className="text-xs text-[var(--text-muted)] mb-4">Powered by spaCy NLP & SERP Intelligence</p>
               <div className="space-y-3">
                 {[
-                  { label: 'M2', name: 'Entity Extraction', desc: 'spaCy en_core_web_lg' },
-                  { label: 'M4', name: 'Novelty Scorer', desc: '3-component weighted' },
-                  { label: 'M5', name: 'Authority Calc.', desc: 'SQLite Authority Baseline' },
-                  { label: 'M6', name: 'Ranking Predictor', desc: 'GradientBoosting ML' },
+                  { label: 'NLP', name: 'Entity Extraction', desc: 'spaCy en_core_web_lg — extracts orgs, products, concepts' },
+                  { label: 'SEM', name: 'Semantic Baseline', desc: 'Cross-competitor topic & cluster analysis' },
+                  { label: 'GAP', name: 'Knowledge Gap Engine', desc: 'Domain-aware gap detection vs. SERP leaders' },
+                  { label: 'REC', name: 'Recommendation Engine', desc: 'Evidence-based SEO recommendations' },
                 ].map((m, i) => (
                   <div key={i} className="flex items-start gap-3">
                     <div 
-                      className="w-7 h-7 rounded text-[var(--aurora)] border border-[var(--aurora)] flex items-center justify-center font-mono text-xs"
+                      className="w-9 h-7 rounded text-[var(--aurora)] border border-[var(--aurora)] flex items-center justify-center font-mono text-[10px] tracking-wider flex-shrink-0"
                       style={{ backgroundColor: 'color-mix(in srgb, var(--aurora) 10%, transparent)' }}
                     >
                       {m.label}
@@ -284,6 +294,16 @@ export default function AnalyzePage() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="card p-5">
+              <h3 className="font-display font-semibold text-[var(--text-primary)] mb-3">How to use</h3>
+              <ol className="space-y-2 text-xs text-[var(--text-muted)] list-decimal list-inside">
+                <li>Enter the exact keyword you want to rank for</li>
+                <li>Paste your draft content in the editor</li>
+                <li>Click <span className="text-[var(--aurora)] font-medium">Analyze Content</span> to run the pipeline</li>
+                <li>Review your semantic gaps, competitor insights &amp; recommendations</li>
+              </ol>
             </div>
           </motion.div>
         </div>
