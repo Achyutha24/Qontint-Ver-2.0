@@ -65,16 +65,34 @@ export function saveReportToRepository(item: Partial<ReportItem>): ReportItem {
     isPinned: item.isPinned || false,
     isArchived: item.isArchived || false,
     tags: item.tags || [item.type || 'SEO', 'Enterprise'],
-    payload: item.payload || {},
+    payload: item.payload ? {
+      ...item.payload,
+      // Strip oversized raw data blobs to keep report repository lightweight
+      raw: item.payload.raw ? {
+        processing_time_ms: item.payload.raw.processing_time_ms,
+        request_id: item.payload.raw.request_id,
+      } : undefined
+    } : {},
     originalRoute: item.originalRoute || '/app/analyze',
   }
 
-  // Prepend new report so newest reports appear first without overwriting prior reports
-  const updated = [newReport, ...existing]
+  // Prepend new report and cap repository size to prevent localStorage exhaustion (keep top 25)
+  const MAX_REPORTS = 25
+  let updated = [newReport, ...existing].slice(0, MAX_REPORTS)
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
   } catch (err) {
-    console.error('Failed to save report to repository:', err)
+    console.warn('Failed to save report to repository (quota exceeded), pruning old payloads...', err)
+    // Emergency quota relief: strip heavy payloads from older non-favorite/non-pinned reports
+    try {
+      updated = updated.map((rep, idx) => {
+        if (idx === 0 || rep.isFavorite || rep.isPinned) return rep
+        return { ...rep, payload: { result: { seoScore: rep.score } } }
+      }).slice(0, 15)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+    } catch (innerErr) {
+      console.error('Failed to save even pruned reports to repository:', innerErr)
+    }
   }
 
   return newReport

@@ -38,8 +38,16 @@ async def ensure_keyword_and_serp(
         await db.commit()
         await db.refresh(kw_obj)
 
+    # Count only rows that have actual body content — rows with empty bodies
+    # cannot contribute to the SERP baseline even if they exist in DB.
+    # Counting all rows caused "SERP baseline insufficient" when scraping
+    # had failed silently and left empty body_content placeholders.
     count_res = await db.execute(
-        select(func.count(SerpResult.id)).where(SerpResult.keyword_id == kw_obj.id)
+        select(func.count(SerpResult.id)).where(
+            SerpResult.keyword_id == kw_obj.id,
+            SerpResult.body_content.isnot(None),
+            SerpResult.body_content != "",
+        )
     )
     serp_count = count_res.scalar() or 0
 

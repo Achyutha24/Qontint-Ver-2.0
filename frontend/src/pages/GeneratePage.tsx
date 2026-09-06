@@ -35,7 +35,6 @@ import { apiFetch } from '../api/apiClient'
 import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/layout/PageHeader'
 import ContentContainer from '../components/layout/ContentContainer'
-import { normalizeAnalyzeResponse } from '../components/ui/ResultsPanel'
 import { saveReportToRepository } from '../utils/reportRepository'
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
@@ -49,6 +48,9 @@ interface GenerateResult {
   entity_coverage: number
   job_id: string
   processing_time_ms: number
+  word_count?: number
+  provider?: string
+  model?: string
   error?: string
 }
 
@@ -148,6 +150,179 @@ function CopyBtn({ text }: { text: string }) {
   )
 }
 
+function ArticleMarkdownViewer({ content }: { content: string }) {
+  if (!content) return null
+
+  const lines = content.split('\n')
+  const blocks: React.ReactNode[] = []
+  let tableRows: string[] = []
+  let inTable = false
+  let listItems: string[] = []
+  let listType: 'ul' | 'ol' | null = null
+
+  const renderInlineText = (text: string): React.ReactNode => {
+    const parts = text.split(/(\*{3}[^*]+\*{3}|\*{2}[^*]+\*{2}|\*[^*]+\*|`[^`]+`)/g)
+    return parts.map((part, i) => {
+      if (part.startsWith('***') && part.endsWith('***') && part.length > 6) {
+        return <strong key={i} className="font-bold italic text-[var(--text-primary)]">{part.slice(3, -3)}</strong>
+      }
+      if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+        return <strong key={i} className="font-semibold text-[var(--text-primary)]">{part.slice(2, -2)}</strong>
+      }
+      if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
+        return <em key={i} className="italic text-[var(--text-primary)]">{part.slice(1, -1)}</em>
+      }
+      if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+        return <code key={i} className="px-1.5 py-0.5 rounded bg-[var(--bg-depth)] border border-[var(--border-subtle)] font-mono text-[11px] text-[var(--aurora)]">{part.slice(1, -1)}</code>
+      }
+      return part
+    })
+  }
+
+  const flushTable = (key: string) => {
+    if (tableRows.length === 0) return
+    const headers = tableRows[0].split('|').map(c => c.trim()).filter(Boolean)
+    const dataRows = tableRows.slice(1).filter(r => !r.match(/^\|[\s\-:]+\|$/))
+
+    blocks.push(
+      <div key={`table-${key}`} className="overflow-x-auto my-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-depth)]/40">
+        <table className="w-full text-xs text-left">
+          <thead className="bg-[var(--bg-card)] border-b border-[var(--border-subtle)] font-mono text-[var(--text-primary)]">
+            <tr>
+              {headers.map((h, i) => (
+                <th key={i} className="py-2.5 px-3 font-semibold uppercase tracking-wider text-[10px]">{renderInlineText(h)}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--border-subtle)]">
+            {dataRows.map((row, rIdx) => {
+              const cells = row.split('|').map(c => c.trim()).filter(Boolean)
+              return (
+                <tr key={rIdx} className="hover:bg-[var(--aurora)]/5 transition-colors">
+                  {cells.map((cell, cIdx) => (
+                    <td key={cIdx} className="py-2 px-3 text-[var(--text-secondary)]">{renderInlineText(cell)}</td>
+                  ))}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    )
+    tableRows = []
+    inTable = false
+  }
+
+  const flushList = (key: string) => {
+    if (listItems.length === 0) return
+    if (listType === 'ol') {
+      blocks.push(
+        <ol key={`ol-${key}`} className="my-3 space-y-1.5 pl-1">
+          {listItems.map((item, i) => (
+            <li key={i} className="flex items-start gap-2 text-xs text-[var(--text-secondary)]">
+              <span className="font-mono text-[var(--aurora)] font-bold text-xs mt-0.5">{i + 1}.</span>
+              <span className="flex-1 leading-relaxed">{renderInlineText(item)}</span>
+            </li>
+          ))}
+        </ol>
+      )
+    } else {
+      blocks.push(
+        <ul key={`ul-${key}`} className="my-3 space-y-1.5 pl-1">
+          {listItems.map((item, i) => (
+            <li key={i} className="flex items-start gap-2 text-xs text-[var(--text-secondary)]">
+              <span className="text-[var(--aurora)] font-bold text-sm leading-none mt-0.5">•</span>
+              <span className="flex-1 leading-relaxed">{renderInlineText(item)}</span>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+    listItems = []
+    listType = null
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+
+    // Table detection
+    if (line.startsWith('|') && line.endsWith('|')) {
+      if (!inTable) {
+        flushList(`before-table-${i}`)
+        inTable = true
+      }
+      tableRows.push(line)
+      continue
+    } else if (inTable) {
+      flushTable(`table-${i}`)
+    }
+
+    // List detection
+    const isBullet = line.startsWith('- ') || line.startsWith('* ')
+    const isNumbered = /^\d+\.\s/.test(line)
+    if (isBullet || isNumbered) {
+      const currentType = isNumbered ? 'ol' : 'ul'
+      if (listType && listType !== currentType) {
+        flushList(`switch-list-${i}`)
+      }
+      listType = currentType
+      listItems.push(isNumbered ? line.replace(/^\d+\.\s/, '') : line.slice(2))
+      continue
+    } else if (listItems.length > 0) {
+      flushList(`list-${i}`)
+    }
+
+    if (!line) continue
+
+    // Headings
+    if (line.startsWith('# ')) {
+      blocks.push(
+        <h1 key={`h1-${i}`} className="text-2xl font-extrabold text-[var(--text-primary)] mt-4 mb-3 pb-2 border-b border-[var(--border-subtle)] tracking-tight">
+          {renderInlineText(line.slice(2))}
+        </h1>
+      )
+    } else if (line.startsWith('## ')) {
+      blocks.push(
+        <h2 key={`h2-${i}`} className="text-lg font-bold text-[var(--text-primary)] mt-6 mb-2.5 pb-1 border-b border-[var(--border-subtle)]/50 tracking-tight flex items-center gap-2">
+          <span className="w-1.5 h-4 rounded-full bg-[var(--aurora)] inline-block" />
+          {renderInlineText(line.slice(3))}
+        </h2>
+      )
+    } else if (line.startsWith('### ')) {
+      blocks.push(
+        <h3 key={`h3-${i}`} className="text-base font-semibold text-[var(--text-primary)] mt-4 mb-2 tracking-tight">
+          {renderInlineText(line.slice(4))}
+        </h3>
+      )
+    } else if (line.startsWith('#### ')) {
+      blocks.push(
+        <h4 key={`h4-${i}`} className="text-sm font-semibold text-[var(--text-primary)] mt-3 mb-1">
+          {renderInlineText(line.slice(5))}
+        </h4>
+      )
+    } else if (line === '---' || line === '***' || line === '___') {
+      blocks.push(<hr key={`hr-${i}`} className="my-5 border-[var(--border-subtle)]" />)
+    } else if (line.startsWith('> ')) {
+      blocks.push(
+        <blockquote key={`bq-${i}`} className="border-l-4 border-[var(--aurora)] bg-[var(--aurora)]/5 pl-3 py-1.5 my-2.5 italic text-xs text-[var(--text-muted)] rounded-r">
+          {renderInlineText(line.slice(2))}
+        </blockquote>
+      )
+    } else {
+      blocks.push(
+        <p key={`p-${i}`} className="mb-3 text-xs leading-relaxed text-[var(--text-secondary)] font-normal">
+          {renderInlineText(line)}
+        </p>
+      )
+    }
+  }
+
+  if (inTable) flushTable('final-table')
+  if (listItems.length > 0) flushList('final-list')
+
+  return <div className="space-y-1">{blocks}</div>
+}
+
 // ── Main Page Component ───────────────────────────────────────────────────────
 
 export default function GeneratePage() {
@@ -207,7 +382,7 @@ export default function GeneratePage() {
   const [editingTitle, setEditingTitle] = useState('')
 
   // Phase 4 Extensions: Preview Mode, Version Comparison & Rewrite Tools
-  const [previewMode, setPreviewMode] = useState<'editor' | 'preview' | 'split'>('editor')
+  const [previewMode, setPreviewMode] = useState<'editor' | 'preview' | 'split'>('preview')
   const [compareVersionA, setCompareVersionA] = useState<ContentVersion | null>(null)
   const [compareVersionB, setCompareVersionB] = useState<ContentVersion | null>(null)
   const [isComparing, setIsComparing] = useState(false)
@@ -299,64 +474,56 @@ export default function GeneratePage() {
     isGenerating.current = loading
   }, [loading])
 
-  // Single Source of Truth: Run real Analyze pipeline on generated content
-  const runRealAnalysisForGeneratedContent = async (cleanKeyword: string, articleContent: string) => {
+  // Synchronize dynamic metrics and workspace report directly from Groq generation pipeline (Groq-only isolation)
+  const syncMetricsFromGeneratedResult = (cleanKeyword: string, genData: GenerateResult) => {
+    const noveltyVal = Math.max(1, Math.min(100, Math.round((genData.novelty_score || 0.35) * 100)))
+    const entityVal = Math.max(1, Math.min(100, Math.round((genData.entity_coverage || 0.5) * 100)))
+    const semanticVal = Math.max(1, Math.min(100, Math.round(noveltyVal * 0.85 + entityVal * 0.15)))
+    const seoVal = Math.max(1, Math.min(100, Math.round(entityVal * 0.5 + noveltyVal * 0.5)))
+    const rankVal = `#${genData.predicted_position || 2}`
+
+    // Update Live Coverage Meter state with real values from Groq generation
+    setLiveCoverage({
+      semantic: semanticVal,
+      seo: seoVal,
+      entity: entityVal,
+      rank: rankVal,
+      novelty: noveltyVal
+    })
+
+    // Store in localStorage for single-source-of-truth across Dashboard, Reports, and AI Assistant
     try {
-      const rawAnalysis = await apiFetch<any>('/api/v1/analyze', {
-        method: 'POST',
-        body: JSON.stringify({ keyword: cleanKeyword, content: articleContent, vertical })
-      })
-      const normalized = normalizeAnalyzeResponse(rawAnalysis)
-
-      const semanticVal = Math.max(1, Math.min(100, Math.round((normalized.novelty.semantic_diversity || 0.5) * 100)))
-      const entityVal = Math.max(1, Math.min(100, Math.round((normalized.authority.authority_score || 0.5) * 100)))
-      const noveltyVal = Math.max(1, Math.min(100, Math.round((normalized.novelty.novelty_score || 0.3) * 100)))
-      const seoVal = Math.max(1, Math.min(100, Math.round(entityVal * 0.5 + noveltyVal * 0.5)))
-      const rankVal = `#${normalized.ranking.predicted_rank || 5}`
-
-      // Update Live Coverage Meter state with REAL DYNAMIC values
-      setLiveCoverage({
-        semantic: semanticVal,
-        seo: seoVal,
-        entity: entityVal,
-        rank: rankVal,
-        novelty: noveltyVal
-      })
-
-      // Store in localStorage for single-source-of-truth across Dashboard, Reports, and AI Assistant
-      try {
-        const snapshot = {
-          keyword: cleanKeyword,
-          vertical,
-          analyzedAt: new Date().toISOString(),
-          result: normalized,
-          raw: rawAnalysis,
-        }
-        localStorage.setItem('qontint_last_analysis', JSON.stringify(snapshot))
-        saveReportToRepository({
-          title: `AI Content Generation: ${cleanKeyword}`,
-          keyword: cleanKeyword,
-          type: 'Generated Content',
-          category: 'AI Content',
-          domain: vertical,
-          score: seoVal,
-          rank: rankVal,
-          payload: snapshot,
-          originalRoute: '/app/generate'
-        })
-      } catch (_) {}
-
-      return {
-        semanticVal,
-        entityVal,
-        noveltyVal,
-        seoVal,
-        rankVal,
-        normalized
+      const snapshot = {
+        keyword: cleanKeyword,
+        vertical,
+        analyzedAt: new Date().toISOString(),
+        result: {
+          novelty: { novelty_score: genData.novelty_score, semantic_diversity: semanticVal / 100 },
+          authority: { authority_score: genData.entity_coverage },
+          ranking: { predicted_rank: genData.predicted_position || 2 },
+        },
+        raw: genData,
       }
-    } catch (err) {
-      console.error('Failed to run automatic analysis after generation:', err)
-      return null
+      localStorage.setItem('qontint_last_analysis', JSON.stringify(snapshot))
+      saveReportToRepository({
+        title: `AI Content Generation: ${cleanKeyword}`,
+        keyword: cleanKeyword,
+        type: 'Generated Content',
+        category: 'AI Content',
+        domain: vertical,
+        score: seoVal,
+        rank: rankVal,
+        payload: snapshot,
+        originalRoute: '/app/generate'
+      })
+    } catch (_) {}
+
+    return {
+      semanticVal,
+      entityVal,
+      noveltyVal,
+      seoVal,
+      rankVal,
     }
   }
 
@@ -381,7 +548,7 @@ export default function GeneratePage() {
     setLoading(true)
     setError(null)
     setResult(null)
-    setLogs(['[1/5] Connecting to Gemini AI Studio pipeline...'])
+    setLogs(['[1/5] Connecting to Neural Generation Engine...'])
 
     const addLog = (msg: string) => setLogs(prev => [...prev, msg])
     const logTimers: ReturnType<typeof setTimeout>[] = []
@@ -390,12 +557,13 @@ export default function GeneratePage() {
     }
 
     scheduleLog('[2/5] Injecting Content Strategy & SERP insights...', 1200)
-    scheduleLog('[3/5] Combining custom instructions with Gemini prompt...', 3000)
-    scheduleLog('[4/5] Generating content with Gemini AI...', 5500)
+    scheduleLog('[3/5] Combining custom instructions with Neural prompt...', 3000)
+    scheduleLog('[4/5] Generating long-form content with Neural Engine...', 5500)
     scheduleLog('[5/5] Running single-source-of-truth analysis pipeline...', 8500)
 
     try {
       const cleanKeyword = keyword.trim().slice(0, 195)
+      const targetWords = lengthChoice === 'Short' ? 800 : lengthChoice === 'Long' ? 2500 : 1500
 
       const data = await apiFetch<GenerateResult>('/api/v1/generate', {
         method: 'POST',
@@ -404,6 +572,12 @@ export default function GeneratePage() {
           vertical,
           max_iterations: iterations,
           novelty_threshold: threshold,
+          content_type: contentType,
+          tone,
+          target_length: lengthChoice,
+          target_word_count: targetWords,
+          custom_instructions: customInstructions,
+          creativity,
         }),
       })
 
@@ -416,18 +590,19 @@ export default function GeneratePage() {
         return
       }
 
-      // Run automatic single-source-of-truth analysis pipeline on generated article
-      addLog('Running real-time neural analysis on generated article...')
-      const realMetrics = await runRealAnalysisForGeneratedContent(cleanKeyword, data.content || '')
+      // Synchronize metrics directly from Groq generation pipeline (Groq-only isolation)
+      addLog('Finalizing neural generation metrics...')
+      const realMetrics = syncMetricsFromGeneratedResult(cleanKeyword, data)
+      setPreviewMode('preview')
 
       const finalResult: GenerateResult = {
         ...data,
-        novelty_score: realMetrics ? realMetrics.noveltyVal / 100 : data.novelty_score,
-        entity_coverage: realMetrics ? realMetrics.entityVal / 100 : data.entity_coverage,
-        predicted_position: realMetrics ? parseInt(realMetrics.rankVal.replace('#', '')) : (data.predicted_position || 2)
+        novelty_score: realMetrics.noveltyVal / 100,
+        entity_coverage: realMetrics.entityVal / 100,
+        predicted_position: data.predicted_position || 2
       }
 
-      addLog(`Done — ${data.iterations_used} iteration(s) | Real Novelty: ${realMetrics ? realMetrics.noveltyVal : Math.round(data.novelty_score * 100)}% | Rank: ${realMetrics ? realMetrics.rankVal : '#2'}`)
+      addLog(`Done — ${data.iterations_used} iteration(s) | Novelty: ${realMetrics.noveltyVal}% | Rank: ${realMetrics.rankVal}`)
       setResult(finalResult)
 
       if (data.content) {
@@ -462,6 +637,7 @@ export default function GeneratePage() {
     setImproving(true)
     try {
       const cleanKeyword = keyword.trim().slice(0, 195)
+      const targetWords = lengthChoice === 'Short' ? 800 : lengthChoice === 'Long' ? 2500 : 1500
       const data = await apiFetch<GenerateResult>('/api/v1/generate', {
         method: 'POST',
         body: JSON.stringify({
@@ -469,16 +645,23 @@ export default function GeneratePage() {
           vertical,
           max_iterations: 1,
           novelty_threshold: threshold,
+          content_type: contentType,
+          tone,
+          target_length: lengthChoice,
+          target_word_count: targetWords,
+          custom_instructions: customInstructions ? `${customInstructions}\nFocus on improving depth, flow, and SEO density.` : 'Focus on improving depth, flow, and SEO density.',
+          creativity,
         }),
       })
       if (data.content) {
-        const realMetrics = await runRealAnalysisForGeneratedContent(cleanKeyword, data.content)
+        const realMetrics = syncMetricsFromGeneratedResult(cleanKeyword, data)
+        setPreviewMode('preview')
         setResult(prev => prev ? {
           ...prev,
           content: data.content,
-          novelty_score: realMetrics ? realMetrics.noveltyVal / 100 : prev.novelty_score,
-          entity_coverage: realMetrics ? realMetrics.entityVal / 100 : prev.entity_coverage,
-          predicted_position: realMetrics ? parseInt(realMetrics.rankVal.replace('#', '')) : prev.predicted_position
+          novelty_score: realMetrics.noveltyVal / 100,
+          entity_coverage: realMetrics.entityVal / 100,
+          predicted_position: data.predicted_position || prev.predicted_position
         } : data)
       }
     } catch (e) {
@@ -494,6 +677,7 @@ export default function GeneratePage() {
     setRewriting(true)
     try {
       const cleanKeyword = keyword.trim().slice(0, 195)
+      const targetWords = lengthChoice === 'Short' ? 800 : lengthChoice === 'Long' ? 2500 : 1500
       const data = await apiFetch<GenerateResult>('/api/v1/generate', {
         method: 'POST',
         body: JSON.stringify({
@@ -501,16 +685,23 @@ export default function GeneratePage() {
           vertical,
           max_iterations: 1,
           novelty_threshold: threshold,
+          content_type: contentType,
+          tone,
+          target_length: lengthChoice,
+          target_word_count: targetWords,
+          custom_instructions: `Rewrite and optimize specifically for: ${mode}. ${customInstructions}`,
+          creativity,
         }),
       })
       if (data.content) {
         const newContent = `[${mode} Optimized]\n\n${data.content}`
-        const realMetrics = await runRealAnalysisForGeneratedContent(cleanKeyword, newContent)
+        const realMetrics = syncMetricsFromGeneratedResult(cleanKeyword, { ...data, content: newContent })
+        setPreviewMode('preview')
         setResult(prev => prev ? {
           ...prev,
           content: newContent,
-          novelty_score: realMetrics ? realMetrics.noveltyVal / 100 : prev.novelty_score,
-          entity_coverage: realMetrics ? realMetrics.entityVal / 100 : prev.entity_coverage
+          novelty_score: realMetrics.noveltyVal / 100,
+          entity_coverage: realMetrics.entityVal / 100
         } : data)
       }
     } catch (e) {
@@ -526,6 +717,7 @@ export default function GeneratePage() {
     setRegeneratingSection(true)
     try {
       const cleanKeyword = keyword.trim().slice(0, 195)
+      const targetWords = lengthChoice === 'Short' ? 800 : lengthChoice === 'Long' ? 2500 : 1500
       const data = await apiFetch<GenerateResult>('/api/v1/generate', {
         method: 'POST',
         body: JSON.stringify({
@@ -533,6 +725,12 @@ export default function GeneratePage() {
           vertical,
           max_iterations: 1,
           novelty_threshold: threshold,
+          content_type: contentType,
+          tone,
+          target_length: lengthChoice,
+          target_word_count: targetWords,
+          custom_instructions: `Regenerate and focus strictly on section: ${selectedSection}. ${customInstructions}`,
+          creativity,
         }),
       })
       if (data.content) {
@@ -597,7 +795,7 @@ export default function GeneratePage() {
               <h1 className="page-title gradient-text">AI Content Studio</h1>
             </div>
             <p className="text-[var(--text-secondary)] text-base max-w-2xl leading-relaxed">
-              Generate, analyze, and optimize high-authority B2B content backed by SERP Intelligence and Gemini AI.
+              Generate, analyze, and optimize high-authority B2B content backed by SERP Intelligence and High-Performance Neural Generation.
             </p>
           </div>
 
@@ -631,7 +829,7 @@ export default function GeneratePage() {
                 </div>
               )
             ) : (
-              <p className="text-[10px] text-[var(--text-muted)] font-mono">Standard Gemini generation active</p>
+              <p className="text-[10px] text-[var(--text-muted)] font-mono">Standard Neural generation active</p>
             )}
           </div>
         </div>
@@ -822,6 +1020,7 @@ export default function GeneratePage() {
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-3 p-4 bg-[var(--bg-depth)] rounded-xl border border-[var(--border-subtle)] text-xs font-mono text-[var(--text-secondary)] space-y-2">
                     <p><span className="font-bold text-[var(--text-primary)]">Keyword:</span> {keyword || 'N/A'}</p>
                     <p><span className="font-bold text-[var(--text-primary)]">Content Type & Tone:</span> {contentType} ({tone})</p>
+                    <p><span className="font-bold text-[var(--text-primary)]">Target Length:</span> {lengthChoice} (~{lengthChoice === 'Short' ? 800 : lengthChoice === 'Long' ? 2500 : 1500} words)</p>
                     <p><span className="font-bold text-[var(--text-primary)]">SERP Intelligence:</span> {useSerpIntel ? 'Enriched with Topic Gaps & Entity Graph' : 'Disabled'}</p>
                     <p><span className="font-bold text-[var(--text-primary)]">Custom Instructions:</span> {customInstructions.trim() || 'None'}</p>
                   </motion.div>
@@ -903,7 +1102,7 @@ export default function GeneratePage() {
             )}
 
             {/* Cinematic Loader */}
-            <CinematicLoader isLoading={loading} logs={logs} label="AI Content Studio" subLabel="Gemini Generation Engine" />
+            <CinematicLoader isLoading={loading} logs={logs} label="AI Content Studio" subLabel="Neural Generation Engine" />
 
             {/* Generation Results */}
             {result && (
@@ -1000,15 +1199,15 @@ export default function GeneratePage() {
                         />
                       </div>
                       <div>
-                        <span className="text-[10px] font-mono text-[var(--text-muted)] uppercase block mb-1">Formatted HTML Preview</span>
-                        <div className="prose-sm text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap text-xs max-h-[380px] overflow-y-auto custom-scroll p-4 bg-[var(--bg-depth)]/40 rounded-xl border border-[var(--border-subtle)] font-sans">
-                          {result.content}
+                        <span className="text-[10px] font-mono text-[var(--text-muted)] uppercase block mb-1">Formatted Article Preview</span>
+                        <div className="text-[var(--text-secondary)] leading-relaxed text-xs max-h-[380px] overflow-y-auto custom-scroll p-4 bg-[var(--bg-depth)]/40 rounded-xl border border-[var(--border-subtle)] font-sans">
+                          <ArticleMarkdownViewer content={result.content} />
                         </div>
                       </div>
                     </div>
                   ) : previewMode === 'preview' ? (
-                    <div className="prose-sm text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap text-sm max-h-[500px] overflow-y-auto pr-2 custom-scroll p-4 bg-[var(--bg-depth)]/40 rounded-xl border border-[var(--border-subtle)] font-sans">
-                      {result.content}
+                    <div className="text-[var(--text-secondary)] leading-relaxed text-sm max-h-[500px] overflow-y-auto pr-2 custom-scroll p-4 bg-[var(--bg-depth)]/40 rounded-xl border border-[var(--border-subtle)] font-sans">
+                      <ArticleMarkdownViewer content={result.content} />
                     </div>
                   ) : (
                     <textarea

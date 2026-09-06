@@ -249,6 +249,12 @@ class GenerateRequest(BaseModel):
     vertical: VerticalType
     max_iterations: int = Field(default=1, ge=1, le=10)
     novelty_threshold: float = Field(default=0.35, ge=0.1, le=1.0)
+    content_type: str | None = None
+    tone: str | None = None
+    target_length: str | None = None
+    target_word_count: int | None = None
+    custom_instructions: str | None = None
+    creativity: str | None = None
 
 
 class GenerateResponse(BaseModel):

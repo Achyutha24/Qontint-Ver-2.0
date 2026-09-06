@@ -28,10 +28,16 @@ class Settings(BaseSettings):
     # ── Mocks (Originals Removed) ─────────────────────────────────────────
     # Removed Neo4j, Redis, Ollama, Celery configs for simple mode
 
-    # ── Gemini API (AI Content) ─────────────────────────────────────────────
+    # ── Gemini API (Analyze, SERP Intel, Assistant — Gemini ONLY) ──────────
     GOOGLE_API_KEY: str | None = None
     GEMINI_MODEL: str = "gemini-flash-latest"
     GEMINI_TIMEOUT: int = 30
+
+    # ── Groq API (Generate Page ONLY — Groq ONLY) ───────────────────────────
+    GROQ_API_KEY: str | None = None
+    GROQ_MODEL: str = "openai/gpt-oss-120b"
+    GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
+    GROQ_TIMEOUT: int = 60
 
     # ── SERP Scraper ──────────────────────────────────────────────────────────
     SCRAPER_DELAY_MS: int = 0

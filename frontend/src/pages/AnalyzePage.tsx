@@ -158,29 +158,68 @@ export default function AnalyzePage() {
           (normalized.novelty?.novelty_score ?? 0) * 0.5) * 100
       )
 
+      // Attach lightweight summary fields so Report and Assistant have real data
+      const enrichedResult = {
+        ...normalized,
+        seoScore: derivedSeoScore,
+        serp_analysis: data.serp_analysis ? {
+          summary: data.serp_analysis.summary,
+          seo_analysis: data.serp_analysis.seo_analysis ? {
+            average_seo_score: data.serp_analysis.seo_analysis.average_seo_score
+          } : undefined,
+          readability: data.serp_analysis.readability ? {
+            average_reading_level: data.serp_analysis.readability.average_reading_level
+          } : undefined,
+          search_intent: data.serp_analysis.search_intent,
+          keyword_analysis: data.serp_analysis.keyword_analysis ? {
+            average_density: data.serp_analysis.keyword_analysis.average_density
+          } : undefined,
+        } : undefined,
+      }
+
+      // Store ONLY the lightweight state required for restoration and navigation.
+      // Crucial: do NOT serialize the raw backend response containing full SERP
+      // bodies, HTML text, and graph data into localStorage (exceeds 5MB browser quota).
       const snapshot = {
         keyword,
         vertical: domain,
         analyzedAt: new Date().toISOString(),
-        result: { ...normalized, seoScore: derivedSeoScore },
-        raw: data,
+        result: enrichedResult,
+        raw: {
+          processing_time_ms: data.total_processing_time_ms || 0,
+        },
       }
-      localStorage.setItem('qontint_last_analysis', JSON.stringify(snapshot))
-      saveReportToRepository({
-        title: `Neural SEO Audit: ${keyword}`,
-        keyword,
-        type: 'Analyze',
-        category: 'Content Audit',
-        domain,
-        score: Math.round(((normalized.authority?.authority_score || 0.8) * 0.5 + (normalized.novelty?.novelty_score || 0.4) * 0.5) * 100),
-        rank: `#${normalized.ranking?.predicted_rank || 3}`,
-        payload: snapshot,
-        originalRoute: '/app/analyze'
-      })
+
+      // Safe, non-blocking client-side persistence: storage quota failures
+      // must NEVER prevent a valid analysis result from displaying to the user.
+      try {
+        localStorage.setItem('qontint_last_analysis', JSON.stringify(snapshot))
+      } catch (storageErr) {
+        console.warn('localStorage quota exceeded on qontint_last_analysis, falling back to sessionStorage:', storageErr)
+        try {
+          sessionStorage.setItem('qontint_last_analysis', JSON.stringify(snapshot))
+        } catch (_) {}
+      }
+
+      try {
+        saveReportToRepository({
+          title: `Neural SEO Audit: ${keyword}`,
+          keyword,
+          type: 'Analyze',
+          category: 'Content Audit',
+          domain,
+          score: derivedSeoScore,
+          rank: `#${normalized.ranking?.predicted_rank || 3}`,
+          payload: snapshot,
+          originalRoute: '/app/analyze',
+        })
+      } catch (repoErr) {
+        console.warn('Failed to save report to repository:', repoErr)
+      }
 
       // Architectural Refactor: Navigate to standalone Report Route!
       // React Router completely unmounts AnalyzePage & AppLayout!
-      navigate('/app/analyze/report', { state: { keyword, result: normalized } })
+      navigate('/app/analyze/report', { state: { keyword, result: enrichedResult } })
     } catch (err: any) {
       setError(err.message || 'An error occurred during analysis.')
     } finally {

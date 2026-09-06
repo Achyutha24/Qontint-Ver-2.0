@@ -62,9 +62,9 @@ export default function AnalyzeReportPage() {
       return
     }
 
-    // 2. Try to load from localStorage cache (for refresh / direct URL access)
+    // 2. Try to load from localStorage or sessionStorage cache (for refresh / direct URL access)
     try {
-      const raw = localStorage.getItem('qontint_last_analysis')
+      const raw = localStorage.getItem('qontint_last_analysis') || sessionStorage.getItem('qontint_last_analysis')
       if (raw) {
         const parsed = JSON.parse(raw)
         if (parsed?.result) {
